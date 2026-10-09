@@ -19,7 +19,7 @@ An Obsidian plugin that brings Dossier/Allume-style stylus glyph commands to Obs
 ## Platform constraints
 
 - Obsidian on iPad runs plugins as JavaScript in a WebKit web view. No Node.js or Electron APIs. Set `isDesktopOnly: false` in `manifest.json`.
-- Gate activation with `Platform.isIosApp && Platform.isTablet` (verify exact flags in the current Obsidian API typings).
+- Gate activation with `Platform.isIosApp && Platform.isTablet` (confirmed on an M5 iPad Pro).
 - Apple Pencil arrives as Pointer Events with `pointerType === "pen"`, plus `pressure`, `tiltX`/`tiltY` (and possibly `altitudeAngle`/`azimuthAngle`). Fingers arrive as `pointerType === "touch"`.
 - **Scribble conflict:** iPadOS Scribble converts handwriting to text in editable fields, including CodeMirror's contenteditable. In the editor this will fight the plugin. Canvas is less affected except inside text nodes being edited. Options: document turning Scribble off, or only claim pen input while a "glyph mode" is active (see Settings).
 - **Dual event streams:** iPadOS WebKit fires pointer events *and* touch events (then compatibility mouse events) for one contact. `preventDefault()` on `pointerdown` does not cancel the matching `touchstart`. Stylus touches are tagged `touch.touchType === "stylus"`, so they can be blocked without touching fingers. The input spike measures which family Canvas actually listens to.
@@ -136,10 +136,21 @@ Settled 2026-10-09:
 - **Distribution:** personal use first, community plugin later. Before publishing: settle licensing (incl. vendored $P code) and contact the Allume team.
 - **Dev loop:** a dedicated test vault synced with Obsidian Sync (plugin + active-plugin-list sync enabled); Safari Web Inspector over USB if Obsidian's web view is inspectable.
 
+## Spike findings
+
+From the first on-device log (2026-10-09, Obsidian 1.14.4, M5 iPad Pro + Pencil Pro):
+
+- With no blocking, Canvas ignores pen drags (no pan, no card drag). Pen **taps** act through compatibility mouse events (`mousedown mouseup click`, `dblclick`): tap selects a card, double-tap on empty canvas creates one. Canvas does handle `pointerdown` itself on a card's drag handle (`defaultPrevented`).
+- Blocking pen pointer events suppresses `mousedown`/`mouseup` but `click` still arrives.
+- Blocking stylus touch events (`touchType === "stylus"`) suppresses all compatibility mouse events including `click`.
+- Leading candidate: block both (mode `all`). Still to confirm with the full protocol: no pen effect, fingers unaffected, Scribble inside an editing card unaffected.
+- Pencil hover arrives as pen `pointermove` with `buttons === 0`; position only, angles read as constant (`altitudeAngle` π/2, `azimuthAngle` 0) while hovering.
+- `getCoalescedEvents()` works (~2 samples per event). Pressure and tilt/altitude/azimuth are reported on contact.
+
 ## Open questions to verify early
 
-- Exact `Platform` flags for iPad detection.
-- Whether pen pointer events reach the plugin before Canvas's own handlers, and whether Canvas uses pointer or touch events internally.
+- ~~Exact `Platform` flags for iPad detection.~~ Confirmed on device: `isIosApp=true isTablet=true isPhone=false isMobileApp=true`.
+- ~~Whether pen pointer events reach the plugin before Canvas's own handlers, and whether Canvas uses pointer or touch events internally.~~ They do (window capture phase); Canvas mostly reacts to compatibility mouse events (see Spike findings).
 - How to reach Canvas undo history, node removal, selection, clipboard and client→canvas coordinate conversion in the current Obsidian version.
-- Whether `getCoalescedEvents()` and Pencil hover events are available in Obsidian's iOS web view.
+- ~~Whether `getCoalescedEvents()` and Pencil hover events are available in Obsidian's iOS web view.~~ Both available (see Spike findings).
 - Whether Obsidian's iOS web view is inspectable from Safari.

@@ -1,0 +1,53 @@
+.pen-glyphs-debug {
+	position: fixed;
+	left: 12px;
+	bottom: 12px;
+	z-index: 1000;
+	width: min(460px, calc(100vw - 24px));
+	max-height: 45vh;
+	display: flex;
+	flex-direction: column;
+	background: color-mix(in srgb, var(--background-primary) 88%, transparent);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	box-shadow: var(--shadow-s);
+	font-family: var(--font-monospace);
+	font-size: 11px;
+}
+
+.pen-glyphs-debug-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 6px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.pen-glyphs-debug-title {
+	font-weight: 600;
+	flex: 1;
+}
+
+.pen-glyphs-debug-actions {
+	display: flex;
+	gap: 4px;
+}
+
+.pen-glyphs-debug-actions button {
+	font-size: 11px;
+	padding: 2px 8px;
+	height: auto;
+}
+
+.pen-glyphs-debug-body {
+	margin: 0;
+	padding: 6px;
+	overflow: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+	user-select: text;
+}
+
+.pen-glyphs-debug.is-collapsed .pen-glyphs-debug-body {
+	display: none;
+}

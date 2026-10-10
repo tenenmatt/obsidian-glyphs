@@ -56,12 +56,17 @@ export function preview(value: unknown): string {
 	return `${typeof value} ${String(value)}`;
 }
 
-/** Build the report for the active (or first) Canvas view, or null if none is open. */
-export function canvasReport(app: App): string | null {
+/** The canvas of the most recently active Canvas view (or the first one), if any. */
+function activeCanvas(app: App): Record<string, any> | undefined {
 	const leaves = app.workspace.getLeavesOfType("canvas");
 	const active = app.workspace.getMostRecentLeaf();
 	const leaf = leaves.find((l) => l === active) ?? leaves[0];
-	const canvas = (leaf?.view as unknown as { canvas?: Record<string, unknown> } | undefined)?.canvas;
+	return (leaf?.view as unknown as { canvas?: Record<string, any> } | undefined)?.canvas;
+}
+
+/** Build the report for the active (or first) Canvas view, or null if none is open. */
+export function canvasReport(app: App): string | null {
+	const canvas = activeCanvas(app);
 	if (!canvas) return null;
 
 	const out: string[] = [
@@ -93,5 +98,84 @@ export async function saveCanvasReport(app: App): Promise<string | null> {
 	const stamp = window.moment().format("YYYY-MM-DD HH-mm-ss");
 	const path = normalizePath(`${LOG_FOLDER}/canvas-api ${stamp}.md`);
 	await vault.create(path, report);
+	return path;
+}
+
+// ---- behavior probe ---------------------------------------------------------
+
+type AnyCanvas = Record<string, any>;
+
+const PROBE_SOURCE_CHARS = 2500;
+const PROBE_TEXT = "pen-glyphs probe";
+
+function fullSource(fn: unknown): string {
+	return typeof fn === "function" ? Function.prototype.toString.call(fn).slice(0, PROBE_SOURCE_CHARS) : "(missing)";
+}
+
+/** Wait a couple of frames so deferred work (e.g. opening an editor) can happen. */
+function settle(ms: number): Promise<void> {
+	return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+/**
+ * Try the operations the adapter needs on a live canvas and report what
+ * happened, removing everything it creates. Nothing is saved and no undo
+ * history is pushed (save: false, and no requestSave()).
+ */
+export async function probeCanvas(canvas: AnyCanvas, waitMs = 300): Promise<string[]> {
+	const lines: string[] = [];
+	for (const name of ["createTextNode", "importData", "removeNode", "removeEdge", "requestSave", "hitTestNode"]) {
+		lines.push(`== source: canvas.${name}`, fullSource(canvas[name]));
+	}
+	const nodes: AnyCanvas[] = canvas.nodes instanceof Map ? [...canvas.nodes.values()] : [];
+	if (nodes[0]) {
+		for (const name of ["moveAndResize", "moveTo", "startEditing"]) {
+			lines.push(`== source: node.${name}`, fullSource(nodes[0][name]));
+		}
+	}
+
+	lines.push("== experiments");
+	const size = { width: 100, height: 60 };
+	const pos = { x: 1000, y: 1000 };
+	const quiet = canvas.createTextNode({ pos, size, text: PROBE_TEXT, focus: false, save: false });
+	lines.push(
+		`createTextNode(pos 1000,1000, size 100x60, focus false) -> x=${quiet.x} y=${quiet.y} w=${quiet.width} h=${quiet.height} editing=${quiet.isEditing}`,
+	);
+	canvas.removeNode(quiet);
+
+	const focused = canvas.createTextNode({ pos, size, text: "", save: false });
+	const editingNow = focused.isEditing;
+	await settle(waitMs);
+	lines.push(`createTextNode(focus default) -> editing immediately=${editingNow}, after ${waitMs}ms=${focused.isEditing}`);
+	canvas.removeNode(focused);
+
+	if (nodes.length >= 2) {
+		const id = "pen-glyphs-probe-edge";
+		const before = canvas.edges.size;
+		const data = canvas.getData();
+		const edge = { id, fromNode: nodes[0].id, fromSide: "right", toNode: nodes[1].id, toSide: "left", toEnd: "arrow" };
+		canvas.importData({ ...data, edges: [...data.edges, edge] });
+		const added = canvas.edges.get(id);
+		lines.push(
+			`importData(+1 edge) -> edges ${before} -> ${canvas.edges.size}, probe edge present=${!!added}, nodes still ${canvas.nodes.size}`,
+		);
+		if (added) canvas.removeEdge(added);
+	} else {
+		lines.push("importData edge experiment skipped: needs two cards");
+	}
+	canvas.requestFrame?.();
+	return lines;
+}
+
+/** Run the probe on the active canvas and write the results into the vault. */
+export async function saveCanvasProbe(app: App): Promise<string | null> {
+	const canvas = activeCanvas(app);
+	if (!canvas) return null;
+	const lines = await probeCanvas(canvas);
+	const vault = app.vault;
+	if (!vault.getAbstractFileByPath(LOG_FOLDER)) await vault.createFolder(LOG_FOLDER);
+	const stamp = window.moment().format("YYYY-MM-DD HH-mm-ss");
+	const path = normalizePath(`${LOG_FOLDER}/canvas-probe ${stamp}.md`);
+	await vault.create(path, ["# Canvas probe", "", "```", ...lines, "```", ""].join("\n"));
 	return path;
 }

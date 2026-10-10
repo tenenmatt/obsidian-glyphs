@@ -1,5 +1,5 @@
 import { Notice, Platform, Plugin } from "obsidian";
-import { saveCanvasReport } from "./dev/canvasInspector";
+import { saveCanvasProbe, saveCanvasReport } from "./dev/canvasInspector";
 import { GestureLog, SaveFixtureModal } from "./dev/fixtures";
 import { Overlay } from "./input/Overlay";
 import { PenCapture } from "./input/PenCapture";
@@ -39,6 +39,11 @@ export default class PenGlyphsPlugin extends Plugin {
 			id: "inspect-canvas-internals",
 			name: "Inspect canvas internals (dev)",
 			callback: () => this.inspectCanvas(),
+		});
+		this.addCommand({
+			id: "probe-canvas-behavior",
+			name: "Probe canvas behavior (dev)",
+			callback: () => this.probeCanvas(),
 		});
 
 		if (!(Platform.isIosApp && Platform.isTablet)) {
@@ -123,6 +128,15 @@ export default class PenGlyphsPlugin extends Plugin {
 			new Notice(path ? `Saved ${path}` : "Open a canvas first");
 		} catch (err) {
 			new Notice(`Inspecting canvas failed: ${String(err)}`);
+		}
+	}
+
+	private async probeCanvas(): Promise<void> {
+		try {
+			const path = await saveCanvasProbe(this.app);
+			new Notice(path ? `Saved ${path}` : "Open a canvas first");
+		} catch (err) {
+			new Notice(`Probing canvas failed: ${String(err)}`);
 		}
 	}
 

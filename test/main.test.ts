@@ -69,7 +69,7 @@ describe("activation", () => {
 		const log = vi.spyOn(console, "log").mockImplementation(() => {});
 		const plugin = await load(null, false);
 		expect(log).toHaveBeenCalledWith("[pen-glyphs] not an iPad; staying inactive");
-		expect(plugin.commands.map((c) => c.id)).toEqual(["inspect-canvas-internals"]);
+		expect(plugin.commands.map((c) => c.id)).toEqual(["inspect-canvas-internals", "probe-canvas-behavior"]);
 		expect(document.querySelector(".pen-glyphs-overlay")).toBeNull();
 	});
 
@@ -79,7 +79,7 @@ describe("activation", () => {
 		const plugin = new PenGlyphsPlugin(new App() as never, { id: "pen-glyphs", version: "1" } as never) as TestPlugin;
 		loaded.push(plugin);
 		await plugin.onload();
-		expect(plugin.commands.map((c) => c.id)).toEqual(["inspect-canvas-internals"]);
+		expect(plugin.commands.map((c) => c.id)).toEqual(["inspect-canvas-internals", "probe-canvas-behavior"]);
 	});
 
 	it("on iPad, shows the panel and overlay with default settings", async () => {
@@ -202,6 +202,27 @@ describe("canvas inspector command", () => {
 
 		await plugin.runCommand("inspect-canvas-internals");
 		expect(Notice.shown[1]).toBe(`Inspecting canvas failed: Error: File already exists: ${path}`);
+	});
+});
+
+describe("canvas probe command", () => {
+	it("asks for a canvas, saves results, and reports failures", async () => {
+		const plugin = await load();
+		await plugin.runCommand("probe-canvas-behavior");
+		expect(Notice.shown).toEqual(["Open a canvas first"]);
+
+		const canvas = {
+			nodes: new Map(),
+			edges: new Map(),
+			createTextNode: () => ({ isEditing: true }),
+			removeNode: () => {},
+		};
+		(plugin.app.workspace as unknown as FakeWorkspace).leaves = [{ view: { canvas } }];
+		await plugin.runCommand("probe-canvas-behavior");
+		expect(Notice.shown[1]).toBe("Saved pen-glyphs-logs/canvas-probe 2026-10-09 12-00-00.md");
+
+		await plugin.runCommand("probe-canvas-behavior");
+		expect(Notice.shown[2]).toMatch(/^Probing canvas failed: Error: File already exists/);
 	});
 });
 

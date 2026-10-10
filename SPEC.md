@@ -114,6 +114,8 @@ A modal opened by a command palette entry ("Pen Glyphs: Show cheatsheet") and op
 - Build on the Mac and sync the build output into an iCloud vault at `.obsidian/plugins/pen-glyphs/` so the iPad picks it up; reload the plugin on the iPad.
 - Remote debugging: check whether Obsidian's iOS web view is inspectable from Safari Web Inspector on a Mac. If it isn't, rely on `DebugPanel`, which logs pointer types, stroke point counts, recognition results and scores on screen.
 - Keep the recognizer and command registry pure and unit-test them on desktop with recorded stroke fixtures. Add a dev command that saves the last stroke as JSON to the vault, to build fixtures from real Pencil input.
+- **Coverage: 100%** of `src/` (lines, branches, functions, statements), enforced by `npm run check`, which `npm run build` runs first. No pre-commit hook. Tests run in Vitest with happy-dom against a fake of the Obsidian API (`test/obsidian.ts`). Code that is genuinely inappropriate to test may be excluded with a `v8 ignore` comment explaining why, but only after discussion.
+- Coverage proves code ran under test, not that iPadOS WebKit behaves as the tests assume. On-device protocols remain the check for input behavior; tests replay the event sequences recorded on device.
 
 ## Milestones
 

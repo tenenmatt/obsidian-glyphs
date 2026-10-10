@@ -2,17 +2,17 @@
 // It never receives input (pointer-events: none), and it redraws only while
 // something is live or fading.
 
-import { PenPoint, PenStroke } from "./PenCapture";
+import { PenPoint, PenStroke } from "./strokes";
 
 // How long a finished stroke stays fully visible, then how long it takes to
 // fade. Recognition (milestone 3) will end the hold early.
-const HOLD_MS = 400;
-const FADE_MS = 250;
-const TAP_FADE_MS = 200;
+export const HOLD_MS = 400;
+export const FADE_MS = 250;
+export const TAP_FADE_MS = 200;
 // Ink width in CSS px at pressure 0 and 1.
-const MIN_WIDTH = 1.5;
-const MAX_WIDTH = 6;
-const HOVER_RADIUS = 4;
+export const MIN_WIDTH = 1.5;
+export const MAX_WIDTH = 6;
+export const HOVER_RADIUS = 4;
 
 interface Ink {
 	points: PenPoint[];

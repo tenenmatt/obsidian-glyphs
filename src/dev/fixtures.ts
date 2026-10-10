@@ -4,7 +4,7 @@
 // skips .json files unless "other file types" is turned on.
 
 import { App, Modal, Notice, Setting, normalizePath } from "obsidian";
-import { PenStroke } from "../input/PenCapture";
+import { PenStroke, lastGesture } from "../input/strokes";
 
 const FIXTURE_FOLDER = "pen-glyphs-fixtures";
 // Strokes that start within this long of the previous stroke ending belong to
@@ -24,14 +24,7 @@ export class GestureLog {
 
 	/** The most recent run of strokes separated by short gaps. */
 	lastGesture(): PenStroke[] {
-		const out: PenStroke[] = [];
-		for (let i = this.strokes.length - 1; i >= 0; i--) {
-			const s = this.strokes[i];
-			const next = out[0];
-			if (next && next.points[0].t - s.points[s.points.length - 1].t > GESTURE_GAP_MS) break;
-			out.unshift(s);
-		}
-		return out;
+		return lastGesture(this.strokes, GESTURE_GAP_MS);
 	}
 }
 
@@ -73,11 +66,11 @@ export class SaveFixtureModal extends Modal {
 	}
 }
 
-async function saveFixture(app: App, label: string, gesture: PenStroke[]): Promise<string> {
+export function serializeFixture(label: string, gesture: PenStroke[], savedAt: Date): string {
 	const t0 = gesture[0].points[0].t;
 	const fixture = {
 		label,
-		savedAt: new Date().toISOString(),
+		savedAt: savedAt.toISOString(),
 		device: {
 			userAgent: navigator.userAgent,
 			devicePixelRatio: window.devicePixelRatio,
@@ -86,12 +79,16 @@ async function saveFixture(app: App, label: string, gesture: PenStroke[]): Promi
 		// Each point is [x, y, t, pressure]: client px, ms since the gesture began, 0..1.
 		strokes: gesture.map((s) => s.points.map((p) => [round(p.x, 1), round(p.y, 1), round(p.t - t0, 1), round(p.p, 3)])),
 	};
+	return "```json\n" + JSON.stringify(fixture) + "\n```\n";
+}
+
+async function saveFixture(app: App, label: string, gesture: PenStroke[]): Promise<string> {
 	const vault = app.vault;
 	if (!vault.getAbstractFileByPath(FIXTURE_FOLDER)) await vault.createFolder(FIXTURE_FOLDER);
 	const safe = label.replace(/[^\w-]+/g, "-");
 	const stamp = window.moment().format("YYYY-MM-DD HH-mm-ss");
 	const path = normalizePath(`${FIXTURE_FOLDER}/${safe} ${stamp}.md`);
-	await vault.create(path, "```json\n" + JSON.stringify(fixture) + "\n```\n");
+	await vault.create(path, serializeFixture(label, gesture, new Date()));
 	return path;
 }
 

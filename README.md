@@ -10,7 +10,9 @@ Apple Pencil glyph commands for Obsidian Canvas on iPad. See [SPEC.md](SPEC.md).
 npm install
 echo "/path/to/Test Vault" > .vault-path   # vault root (the folder containing .obsidian)
 npm run dev                                # watch; copies the plugin into the vault on every build
-npm run build                              # typecheck + one production build
+npm test                                   # run tests (npm run test:watch to watch)
+npm run check                              # typecheck + tests with 100% coverage required
+npm run build                              # check, then one production build
 ```
 
 With Obsidian Sync, desktop Obsidian must have the test vault open to upload changes, and both devices need **Settings → Sync → Installed community plugins** and **Active community plugin list** turned on. On the iPad, reload the plugin by toggling it under Community plugins or by running "Reload app without saving".

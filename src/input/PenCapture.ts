@@ -10,19 +10,8 @@
 // handler Canvas attaches to its own elements.
 
 import { Plugin } from "obsidian";
-
-export interface PenPoint {
-	x: number; // client px
-	y: number;
-	t: number; // ms, event timeStamp
-	p: number; // pressure 0..1
-}
-
-export interface PenStroke {
-	kind: "tap" | "stroke";
-	points: PenPoint[];
-	target: Element;
-}
+import { describe } from "../util/dom";
+import { PenPoint, PenStroke, classify } from "./strokes";
 
 export interface PenCaptureHandlers {
 	strokeStart(point: PenPoint): void;
@@ -34,12 +23,8 @@ export interface PenCaptureHandlers {
 	log(line: string): void;
 }
 
-// A pen contact shorter than this, that never strays farther than TAP_MAX_DIST
-// from where it started, is a tap rather than a stroke.
-const TAP_MAX_MS = 200;
-const TAP_MAX_DIST = 8;
-// Belt and braces: swallow any compatibility mouse events that still arrive
-// this soon after a pen stroke, unless a finger has touched down since.
+// Belt and braces: swallow any compatibility mouse events on the canvas that
+// still arrive this soon after a pen stroke, unless a finger has touched down since.
 const MOUSE_SUPPRESS_MS = 300;
 // Hover normally ends with a pointerout as the pen leaves range; this timeout
 // is the fallback if that never arrives.
@@ -133,9 +118,9 @@ export class PenCapture {
 			this.h.strokeCancel();
 			return;
 		}
-		const last = toPoint(e);
-		const prev = a.points[a.points.length - 1];
-		if (last.x !== prev.x || last.y !== prev.y) a.points.push(last);
+		// Always keep the lift point, even at the same spot: its time is what
+		// makes a press-and-hold a stroke rather than a tap.
+		a.points.push(toPoint(e));
 		this.h.strokeEnd({ kind: classify(a.points), points: a.points, target: a.target });
 	};
 
@@ -166,6 +151,7 @@ export class PenCapture {
 	};
 
 	private onMouse = (e: MouseEvent): void => {
+		if (!(e.target instanceof Element) || !e.target.closest(CANVAS_SURFACE)) return;
 		if (this.active || performance.now() < this.suppressMouseUntil) block(e);
 	};
 
@@ -204,14 +190,6 @@ export class PenCapture {
 	}
 }
 
-function classify(points: PenPoint[]): PenStroke["kind"] {
-	const first = points[0];
-	const duration = points[points.length - 1].t - first.t;
-	if (duration > TAP_MAX_MS) return "stroke";
-	const strayed = points.some((p) => Math.hypot(p.x - first.x, p.y - first.y) > TAP_MAX_DIST);
-	return strayed ? "stroke" : "tap";
-}
-
 function toPoint(e: PointerEvent): PenPoint {
 	return { x: e.clientX, y: e.clientY, t: e.timeStamp, p: e.pressure };
 }
@@ -223,9 +201,4 @@ function block(e: Event): void {
 
 function isStylus(t: Touch): boolean {
 	return (t as Touch & { touchType?: string }).touchType === "stylus";
-}
-
-export function describe(target: Element): string {
-	const cls = Array.from(target.classList).slice(0, 3).join(".");
-	return target.tagName.toLowerCase() + (cls ? `.${cls}` : "");
 }

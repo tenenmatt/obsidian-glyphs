@@ -2,3 +2,4 @@ node_modules/
 build/
 .vault-path
 .DS_Store
+coverage/

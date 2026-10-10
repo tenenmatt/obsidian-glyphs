@@ -1,8 +1,10 @@
 import { Notice, Platform, Plugin } from "obsidian";
 import { GestureLog, SaveFixtureModal } from "./dev/fixtures";
 import { Overlay } from "./input/Overlay";
-import { PenCapture, PenStroke, describe } from "./input/PenCapture";
+import { PenCapture } from "./input/PenCapture";
+import { PenStroke, strokeStats } from "./input/strokes";
 import { DebugPanel } from "./ui/DebugPanel";
+import { describe } from "./util/dom";
 
 interface PenGlyphsSettings {
 	// When off, the pen behaves exactly as it does without the plugin.
@@ -89,26 +91,15 @@ export default class PenGlyphsPlugin extends Plugin {
 	private onStroke(stroke: PenStroke): void {
 		this.overlay.end(stroke);
 		this.gestures.add(stroke);
-		const pts = stroke.points;
-		const first = pts[0];
+		const first = stroke.points[0];
 		if (stroke.kind === "tap") {
 			this.panel.log(`tap at (${Math.round(first.x)},${Math.round(first.y)}) on ${describe(stroke.target)}`);
 			return;
 		}
-		let length = 0;
-		let [minX, minY, maxX, maxY] = [first.x, first.y, first.x, first.y];
-		for (let i = 1; i < pts.length; i++) {
-			length += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
-			minX = Math.min(minX, pts[i].x);
-			minY = Math.min(minY, pts[i].y);
-			maxX = Math.max(maxX, pts[i].x);
-			maxY = Math.max(maxY, pts[i].y);
-		}
-		const ms = Math.round(pts[pts.length - 1].t - first.t);
-		const maxP = Math.max(...pts.map((p) => p.p));
+		const s = strokeStats(stroke.points);
 		this.panel.log(
-			`stroke: ${pts.length} pts, ${ms}ms, length ${Math.round(length)}px,` +
-				` box ${Math.round(maxX - minX)}×${Math.round(maxY - minY)}, max pressure ${maxP.toFixed(2)}`,
+			`stroke: ${stroke.points.length} pts, ${Math.round(s.ms)}ms, length ${Math.round(s.length)}px,` +
+				` box ${Math.round(s.width)}×${Math.round(s.height)}, max pressure ${s.maxPressure.toFixed(2)}`,
 		);
 	}
 

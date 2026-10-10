@@ -1,18 +1,24 @@
 {
   "name": "pen-glyphs",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "Apple Pencil glyph commands for Obsidian on iPad",
   "type": "module",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "tsc --noEmit && node esbuild.config.mjs production",
-    "typecheck": "tsc --noEmit"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "tsc --noEmit && vitest run --coverage",
+    "build": "npm run check && node esbuild.config.mjs production"
   },
   "license": "UNLICENSED",
   "devDependencies": {
+    "@types/node": "24.19.2",
+    "@vitest/coverage-v8": "4.1.11",
     "esbuild": "0.27.7",
+    "happy-dom": "20.14.5",
     "obsidian": "1.13.1",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
   }
 }

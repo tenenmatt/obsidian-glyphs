@@ -104,6 +104,11 @@ export class Plugin extends Component {
 		return command;
 	}
 
+	settingTabs: PluginSettingTab[] = [];
+	addSettingTab(tab: PluginSettingTab): void {
+		this.settingTabs.push(tab);
+	}
+
 	addRibbonIcon(icon: string, title: string, callback: (e: MouseEvent) => unknown): HTMLElement {
 		this.ribbon.push({ icon, title, callback });
 		return document.createElement("div");
@@ -142,6 +147,30 @@ export class Modal {
 	onClose(): void {}
 }
 
+export class PluginSettingTab {
+	containerEl = document.createElement("div");
+	constructor(
+		public app: App,
+		public plugin: Plugin,
+	) {}
+	display(): void {}
+}
+
+class ToggleComponent {
+	toggleEl = document.createElement("input");
+	constructor() {
+		this.toggleEl.type = "checkbox";
+	}
+	setValue(on: boolean): this {
+		this.toggleEl.checked = on;
+		return this;
+	}
+	onChange(cb: (on: boolean) => unknown): this {
+		this.toggleEl.addEventListener("change", () => cb(this.toggleEl.checked));
+		return this;
+	}
+}
+
 class TextComponent {
 	inputEl = document.createElement("input");
 	setPlaceholder(placeholder: string): this {
@@ -177,6 +206,16 @@ export class Setting {
 	}
 	setName(name: string): this {
 		this.settingEl.createDiv({ cls: "setting-item-name", text: name });
+		return this;
+	}
+	setDesc(desc: string): this {
+		this.settingEl.createDiv({ cls: "setting-item-description", text: desc });
+		return this;
+	}
+	addToggle(cb: (t: ToggleComponent) => unknown): this {
+		const t = new ToggleComponent();
+		this.settingEl.appendChild(t.toggleEl);
+		cb(t);
 		return this;
 	}
 	addText(cb: (t: TextComponent) => unknown): this {

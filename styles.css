@@ -70,3 +70,67 @@
 .pen-glyphs-fixture-labels button {
 	min-width: 64px;
 }
+
+.pen-glyphs-flash {
+	position: fixed;
+	left: 50%;
+	top: 45%;
+	transform: translate(-50%, -50%);
+	z-index: 1001;
+	pointer-events: none;
+	padding: 8px 18px;
+	border-radius: 999px;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	font-size: var(--font-ui-medium);
+	font-weight: 600;
+	box-shadow: var(--shadow-s);
+	opacity: 0;
+	transition: opacity 200ms ease-out;
+}
+
+.pen-glyphs-flash.is-visible {
+	opacity: 1;
+	transition: none;
+}
+
+.pen-glyphs-flash.is-miss {
+	background: var(--background-modifier-border);
+	color: var(--text-muted);
+}
+
+.pen-glyphs-cheatsheet {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.pen-glyphs-cheatsheet-row {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+}
+
+.pen-glyphs-cheatsheet-icon {
+	flex: none;
+	fill: var(--interactive-accent);
+	stroke: var(--interactive-accent);
+	stroke-width: 3;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	background: var(--background-secondary);
+	border-radius: 8px;
+}
+
+.pen-glyphs-cheatsheet-icon polyline {
+	fill: none;
+}
+
+.pen-glyphs-cheatsheet-name {
+	font-weight: 600;
+}
+
+.pen-glyphs-cheatsheet-does {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}

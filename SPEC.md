@@ -116,8 +116,8 @@ Use CodeMirror 6's `EditorView.posAtCoords` to map points to document positions,
 
 ## Feedback
 
-- **Flash notice:** brief centered label naming the command ("delete card", "paste"), fading out after ~600 ms. Use the same names as the cheatsheet.
-- Stroke fades out on recognition. On a miss, stroke shakes or turns gray briefly.
+- **Flash notice:** brief centered label naming what the command did ("select 3 cards", "delete card", "new card", "connect"), fading out after ~600 ms, using the cheatsheet's names. A recognized glyph with nothing to act on says so ("no card under the x"). Pen taps don't flash. An unrecognized stroke flashes a gray "?" only if **Show unrecognized strokes** is on.
+- Stroke ink clears almost at once on recognition; on a miss it turns gray and lingers briefly (regardless of the setting).
 
 ## Cheatsheet
 
@@ -125,7 +125,10 @@ A modal opened by a command palette entry ("Pen Glyphs: Show cheatsheet") and op
 
 ## Settings
 
+Implemented so far (settings tab, `display()`-based; Obsidian 1.13's declarative `getSettingDefinitions()` is the successor to adopt once minAppVersion allows): glyph mode, show unrecognized strokes, debug panel.
+
 - Enable/disable per context (Canvas, Editor).
+- Show unrecognized strokes (flash "?"), default on.
 - Glyph mode: **always on** vs **toggle** (a command or ribbon button switches glyph mode on/off, so Scribble keeps working when it's off).
 - Recognition threshold.
 - Pen tap on empty canvas: pass through / create text node.
@@ -146,7 +149,7 @@ A modal opened by a command palette entry ("Pen Glyphs: Show cheatsheet") and op
 2. ✅ Stroke overlay rendering, hover dot, fixture recording.
 3. ✅ Recognizer (x, lasso, caret, v, square, line); debug panel showing results.
 4. ✅ `CanvasAdapter` and canvas commands: lasso select, X delete (with undo), square new card, line connect, pen tap select. Starts with a dev command that dumps the Canvas internals available in the running Obsidian version.
-5. Flash notices and cheatsheet.
+5. Flash notices, cheatsheet, settings tab (glyph mode, show unrecognized strokes, debug panel).
 6. Copy/paste glyphs, settings, glyph-mode toggle.
 7. v2: editor glyphs, custom templates, finger-as-modifier.
 

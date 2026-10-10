@@ -43,6 +43,12 @@ proto.setText = function (this: HTMLElement, text: string) {
 proto.toggleClass = function (this: HTMLElement, cls: string, on: boolean) {
 	this.classList.toggle(cls, on);
 };
+proto.addClass = function (this: HTMLElement, ...cls: string[]) {
+	this.classList.add(...cls);
+};
+proto.removeClass = function (this: HTMLElement, ...cls: string[]) {
+	this.classList.remove(...cls);
+};
 
 (window as unknown as { moment: () => { format: () => string } }).moment = () => ({
 	format: () => "2026-10-09 12-00-00",

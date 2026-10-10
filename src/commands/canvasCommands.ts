@@ -7,11 +7,17 @@ import { CanvasAdapter, CanvasNode, Rect, Side } from "../targets/CanvasAdapter"
 
 export type CanvasGesture = GlyphName | "tap";
 
+/** What a command did: `label` is shown in the flash notice, `detail` only in the debug log. */
+export interface Outcome {
+	label: string;
+	detail?: string;
+}
+
 /**
  * Run the command for a recognized glyph drawn at `client` points (in client
- * coordinates). Returns a short description of what happened, for feedback.
+ * coordinates). Labels use the command names from the cheatsheet.
  */
-export function runCanvasGlyph(canvas: CanvasAdapter, gesture: CanvasGesture, client: Pt[]): string {
+export function runCanvasGlyph(canvas: CanvasAdapter, gesture: CanvasGesture, client: Pt[]): Outcome {
 	const points = client.map((p) => canvas.toCanvas(p));
 	switch (gesture) {
 		case "tap":
@@ -25,18 +31,18 @@ export function runCanvasGlyph(canvas: CanvasAdapter, gesture: CanvasGesture, cl
 			return line(canvas, points);
 		case "caret":
 		case "v":
-			return `${gesture === "caret" ? "copy" : "paste"}: not available yet`;
+			return { label: `${gesture === "caret" ? "copy" : "paste"} (coming soon)` };
 	}
 }
 
-function tap(canvas: CanvasAdapter, p: Pt): string {
+function tap(canvas: CanvasAdapter, p: Pt): Outcome {
 	const card = canvas.cardAt(p);
 	if (!card) {
 		canvas.clearSelection();
-		return "cleared selection";
+		return { label: "clear selection" };
 	}
 	canvas.select([card]);
-	return "selected card";
+	return { label: "select card" };
 }
 
 /**
@@ -44,29 +50,29 @@ function tap(canvas: CanvasAdapter, p: Pt): string {
  * squarish lasso never creates a card. Over empty space, a square creates a
  * card and a lasso clears the selection.
  */
-function loop(canvas: CanvasAdapter, glyph: "lasso" | "square", poly: Pt[]): string {
+function loop(canvas: CanvasAdapter, glyph: "lasso" | "square", poly: Pt[]): Outcome {
 	const box = toRect(poly);
 	const enclosed = canvas.cardsOverlapping(box).filter((card) => pointInPolygon(center(card), poly));
 	if (enclosed.length > 0) {
 		canvas.select(enclosed);
-		return `selected ${plural(enclosed.length, "card")}`;
+		return { label: `select ${plural(enclosed.length, "card")}` };
 	}
 	if (glyph === "square") {
 		canvas.createCard(box);
-		return "new card";
+		return { label: "new card" };
 	}
 	canvas.clearSelection();
-	return "cleared selection";
+	return { label: "clear selection" };
 }
 
 /** Delete the card under the X's center, or the whole selection if that card is selected. */
-function cross(canvas: CanvasAdapter, points: Pt[]): string {
+function cross(canvas: CanvasAdapter, points: Pt[]): Outcome {
 	const box = toRect(points);
 	const card = canvas.cardAt({ x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 });
-	if (!card) return "delete: no card under the x";
-	if (canvas.isSelected(card)) return `deleted ${plural(canvas.deleteSelection(), "card")}`;
+	if (!card) return { label: "no card under the x" };
+	if (canvas.isSelected(card)) return { label: `delete ${plural(canvas.deleteSelection(), "card")}` };
 	canvas.deleteCards([card]);
-	return "deleted card";
+	return { label: "delete card" };
 }
 
 /**
@@ -74,10 +80,10 @@ function cross(canvas: CanvasAdapter, points: Pt[]): string {
  * attaching the arrow to the side the stroke left from and the side it
  * entered by.
  */
-function line(canvas: CanvasAdapter, points: Pt[]): string {
+function line(canvas: CanvasAdapter, points: Pt[]): Outcome {
 	const from = canvas.cardAt(points[0]);
 	const to = canvas.cardAt(points[points.length - 1]);
-	if (!from || !to || from === to) return "connect: start and end on two different cards";
+	if (!from || !to || from === to) return { label: "connect: start and end on two cards" };
 	// The first point after the stroke last leaves `from`, and the last point
 	// before it first enters `to`. Overlapping cards may leave no such point.
 	const lastOnFrom = points.map((p) => contains(from, p)).lastIndexOf(true);
@@ -85,7 +91,7 @@ function line(canvas: CanvasAdapter, points: Pt[]): string {
 	const fromSide = sideCrossed(from, points[lastOnFrom + 1] ?? points[lastOnFrom]);
 	const toSide = sideCrossed(to, points[firstOnTo - 1] ?? points[firstOnTo]);
 	canvas.connect(from, to, { fromSide, toSide });
-	return `connected cards (${fromSide} → ${toSide})`;
+	return { label: "connect", detail: `${fromSide} → ${toSide}` };
 }
 
 function contains(card: CanvasNode, p: Pt): boolean {

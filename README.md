@@ -2,7 +2,7 @@
 
 Apple Pencil glyph commands for Obsidian Canvas on iPad. See [SPEC.md](SPEC.md).
 
-**Status: milestone 4 (canvas commands).** On iPad, pen glyphs act on Canvas: lasso selects, X deletes, square creates a card, a line connects two cards, a pen tap selects. Copy/paste (caret, v) come later. Fingers behave normally; elsewhere the plugin stays inactive.
+**Status: milestone 5 (feedback).** On iPad, pen glyphs act on Canvas (lasso select, X delete, square new card, line connect, pen tap select) and a centered label names each action. "Pen Glyphs: Show cheatsheet" lists every glyph. Settings: glyph mode, show unrecognized strokes, debug panel. Copy/paste (caret, v) come later.
 
 ## Dev setup
 
@@ -18,6 +18,14 @@ node scripts/build-templates.ts            # regenerate src/recognize/templates.
 ```
 
 With Obsidian Sync, desktop Obsidian must have the test vault open to upload changes, and both devices need **Settings → Sync → Installed community plugins** and **Active community plugin list** turned on. On the iPad, reload the plugin by toggling it under Community plugins or by running "Reload app without saving".
+
+## Test protocol (milestone 5)
+
+1. Each glyph flashes a centered label: "select 2 cards", "delete card", "new card", "connect", "clear selection". Pen taps don't flash.
+2. An X over empty canvas flashes "no card under the x"; a line that misses a card flashes "connect: start and end on two cards".
+3. A scribble flashes a gray "?". Turn off **Settings → Pen Glyphs → Show unrecognized strokes**: scribbles no longer flash (the ink still grays).
+4. Run **Pen Glyphs: Show cheatsheet**: seven glyphs with drawings and descriptions.
+5. Toggle **Debug panel** and **Glyph mode** in settings; both take effect immediately.
 
 ## Test protocol (milestone 4)
 

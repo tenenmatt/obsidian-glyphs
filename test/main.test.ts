@@ -51,6 +51,10 @@ function drawStroke(target: Element, points: PenPoint[]) {
 	pointer(target, "pointerup", { x: last.x, y: last.y, t: last.t, p: last.p });
 }
 
+function flashEl(): HTMLElement {
+	return document.querySelector<HTMLElement>(".pen-glyphs-flash")!;
+}
+
 async function settle() {
 	await new Promise((r) => setTimeout(r, 0));
 }
@@ -85,14 +89,14 @@ describe("activation", () => {
 
 	it("on iPad, shows the panel and overlay with default settings", async () => {
 		const plugin = await load();
-		expect(plugin.settings).toEqual({ glyphMode: true, showDebugPanel: true });
+		expect(plugin.settings).toEqual({ glyphMode: true, showMisses: true, showDebugPanel: true });
 		expect(document.querySelector(".pen-glyphs-overlay")).not.toBeNull();
 		expect(panelText()).toContain("loaded test-build; glyph mode on");
 	});
 
 	it("restores saved settings", async () => {
-		const plugin = await load({ glyphMode: false, showDebugPanel: false, blockMode: "all" });
-		expect(plugin.settings).toEqual({ glyphMode: false, showDebugPanel: false });
+		const plugin = await load({ glyphMode: false, showMisses: false, showDebugPanel: false, blockMode: "all" });
+		expect(plugin.settings).toEqual({ glyphMode: false, showMisses: false, showDebugPanel: false });
 		expect(document.querySelector(".pen-glyphs-debug")).toBeNull();
 	});
 
@@ -202,7 +206,7 @@ describe("glyphs on a canvas", () => {
 		pointer(view.wrapper, "pointerdown", { x: 20, y: 20, t: 0 });
 		pointer(view.wrapper, "pointerup", { x: 20, y: 20, t: 50 });
 		expect([...canvas.selection]).toEqual([card]);
-		expect(panelText()).toContain("tap at (20,20) on div.canvas-wrapper: selected card");
+		expect(panelText()).toContain("tap at (20,20) on div.canvas-wrapper: select card");
 	});
 
 	it("a recognized glyph runs its command and logs the outcome", async () => {
@@ -210,6 +214,34 @@ describe("glyphs on a canvas", () => {
 		drawStroke(view.wrapper, shapes.square());
 		expect(canvas.nodes.size).toBe(1);
 		expect(panelText()).toMatch(/✓ square \(closed, \d corners, fill \d\.\d\d\) → new card/);
+	});
+
+	it("flashes the command's label, but not for taps", async () => {
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		try {
+			const { view, canvas } = await canvasPlugin();
+			canvas.addCard(0, 0);
+			pointer(view.wrapper, "pointerdown", { x: 20, y: 20, t: 0 });
+			pointer(view.wrapper, "pointerup", { x: 20, y: 20, t: 50 });
+			expect(flashEl().classList.contains("is-visible")).toBe(false);
+			drawStroke(view.wrapper, shapes.square().map((p) => ({ ...p, x: p.x + 300 })));
+			expect(flashEl().textContent).toBe("new card");
+			expect(flashEl().classList.contains("is-visible")).toBe(true);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("flashes ? for an unrecognized stroke only when showMisses is on", async () => {
+		const { plugin, view } = await canvasPlugin();
+		drawStroke(view.wrapper, shapes.zigzag());
+		expect(flashEl().textContent).toBe("?");
+		expect(flashEl().classList.contains("is-miss")).toBe(true);
+
+		flashEl().textContent = "";
+		await plugin.updateSetting("showMisses", false);
+		drawStroke(view.wrapper, shapes.zigzag());
+		expect(flashEl().textContent).toBe("");
 	});
 
 	it("an unrecognized stroke runs nothing", async () => {
@@ -223,9 +255,9 @@ describe("glyphs on a canvas", () => {
 		const { view } = await canvasPlugin({ nodes: new Map() });
 		pointer(view.wrapper, "pointerdown", { t: 0 });
 		pointer(view.wrapper, "pointerup", { t: 50 });
-		const message = "Canvas internals unavailable (missing: posFromClient, hitTestNode, getIntersectingNodes, selectOnly, selectAll, deselectAll, removeNode, deleteSelection, requestSave, createTextNode, importData, selection)";
-		expect(Notice.shown).toEqual([`Pen Glyphs: ${message}`]);
-		expect(panelText()).toContain(message);
+		const missing = "missing: posFromClient, hitTestNode, getIntersectingNodes, selectOnly, selectAll, deselectAll, removeNode, deleteSelection, requestSave, createTextNode, importData, selection";
+		expect(Notice.shown).toEqual([`Pen Glyphs: canvas internals unavailable (${missing})`]);
+		expect(panelText()).toContain(`canvas unavailable (${missing})`);
 	});
 
 	it("reports a command that throws", async () => {
@@ -237,7 +269,36 @@ describe("glyphs on a canvas", () => {
 		pointer(view.wrapper, "pointerdown", { t: 0 });
 		pointer(view.wrapper, "pointerup", { t: 50 });
 		expect(Notice.shown).toEqual(["Pen Glyphs: tap failed: Error: boom"]);
-		expect(panelText()).toContain("failed: Error: boom");
+		expect(panelText()).toContain("tap failed (Error: boom)");
+	});
+});
+
+describe("settings and cheatsheet", () => {
+	it("registers a settings tab wired to this plugin", async () => {
+		const plugin = await load();
+		const tabs = (plugin as unknown as { settingTabs: { plugin: unknown }[] }).settingTabs;
+		expect(tabs).toHaveLength(1);
+		expect(tabs[0].plugin).toBe(plugin);
+	});
+
+	it("updateSetting persists and applies each setting", async () => {
+		const plugin = await load();
+		await plugin.updateSetting("showDebugPanel", false);
+		expect(document.querySelector(".pen-glyphs-debug")).toBeNull();
+		expect(plugin.data).toMatchObject({ showDebugPanel: false });
+		await plugin.updateSetting("showDebugPanel", true);
+		expect(document.querySelector(".pen-glyphs-debug")).not.toBeNull();
+		await plugin.updateSetting("glyphMode", false);
+		expect(panelText()).toContain("---- glyph mode off ----");
+		await plugin.updateSetting("showMisses", false);
+		expect(plugin.data).toMatchObject({ glyphMode: false, showMisses: false, showDebugPanel: true });
+	});
+
+	it("opens the cheatsheet", async () => {
+		const plugin = await load();
+		plugin.runCommand("show-cheatsheet");
+		expect(Modal.opened).toHaveLength(1);
+		expect(Modal.opened[0].contentEl.querySelectorAll(".pen-glyphs-cheatsheet-row")).toHaveLength(7);
 	});
 });
 

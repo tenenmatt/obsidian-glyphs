@@ -1,5 +1,5 @@
 import { Notice, Platform, Plugin } from "obsidian";
-import { CanvasGesture, runCanvasGlyph } from "./commands/canvasCommands";
+import { CanvasGesture, Outcome, runCanvasGlyph } from "./commands/canvasCommands";
 import { saveCanvasProbe, saveCanvasReport } from "./dev/canvasInspector";
 import { GestureLog, SaveFixtureModal } from "./dev/fixtures";
 import { Overlay } from "./input/Overlay";
@@ -8,33 +8,22 @@ import { PenStroke, strokeStats } from "./input/strokes";
 import { Recognizer, describeRecognition } from "./recognize/Recognizer";
 import { TEMPLATES } from "./recognize/templates";
 import { CanvasAdapter, canvasViewFor } from "./targets/CanvasAdapter";
+import { CheatsheetModal, cheatsheetEntries } from "./ui/Cheatsheet";
 import { DebugPanel } from "./ui/DebugPanel";
+import { Flash } from "./ui/Flash";
+import { DEFAULT_SETTINGS, PenGlyphsSettingTab, PenGlyphsSettings, loadSettings } from "./ui/SettingsTab";
 import { describe } from "./util/dom";
-
-interface PenGlyphsSettings {
-	// When off, the pen behaves exactly as it does without the plugin.
-	glyphMode: boolean;
-	showDebugPanel: boolean;
-}
-
-const DEFAULT_SETTINGS: PenGlyphsSettings = {
-	glyphMode: true,
-	showDebugPanel: true,
-};
 
 export default class PenGlyphsPlugin extends Plugin {
 	override settings: PenGlyphsSettings = { ...DEFAULT_SETTINGS };
 	private panel!: DebugPanel;
 	private overlay!: Overlay;
+	private flash!: Flash;
 	private gestures = new GestureLog();
 	private recognizer = new Recognizer(TEMPLATES);
 
 	override async onload(): Promise<void> {
-		const data = (await this.loadData()) ?? {};
-		this.settings = {
-			glyphMode: data.glyphMode ?? DEFAULT_SETTINGS.glyphMode,
-			showDebugPanel: data.showDebugPanel ?? DEFAULT_SETTINGS.showDebugPanel,
-		};
+		this.settings = loadSettings(await this.loadData());
 
 		// Dev: available everywhere, since desktop Canvas has the same internals.
 		this.addCommand({
@@ -66,6 +55,8 @@ export default class PenGlyphsPlugin extends Plugin {
 		this.overlay = new Overlay();
 		this.register(() => this.overlay.destroy());
 		this.registerDomEvent(window, "resize", this.overlay.resize);
+		this.flash = new Flash();
+		this.register(() => this.flash.destroy());
 
 		new PenCapture(
 			{
@@ -80,7 +71,13 @@ export default class PenGlyphsPlugin extends Plugin {
 			() => this.settings.glyphMode,
 		).register(this);
 
+		this.addSettingTab(new PenGlyphsSettingTab(this.app, this));
 		this.addRibbonIcon("pen-tool", "Pen Glyphs: toggle glyph mode", () => this.toggleGlyphMode());
+		this.addCommand({
+			id: "show-cheatsheet",
+			name: "Show cheatsheet",
+			callback: () => new CheatsheetModal(this.app, cheatsheetEntries(TEMPLATES)).open(),
+		});
 		this.addCommand({
 			id: "toggle-glyph-mode",
 			name: "Toggle glyph mode",
@@ -94,16 +91,24 @@ export default class PenGlyphsPlugin extends Plugin {
 		this.addCommand({
 			id: "toggle-debug-panel",
 			name: "Toggle debug panel",
-			callback: async () => {
-				if (this.panel.isShown) this.panel.hide();
-				else this.panel.show();
-				this.settings.showDebugPanel = this.panel.isShown;
-				await this.saveData(this.settings);
-			},
+			callback: () => this.updateSetting("showDebugPanel", !this.panel.isShown),
 		});
 		this.addCommand({ id: "save-debug-log", name: "Save debug log to vault", callback: () => this.saveLog() });
 		this.addCommand({ id: "copy-debug-log", name: "Copy debug log to clipboard", callback: () => this.panel.copy() });
 		this.addCommand({ id: "clear-debug-log", name: "Clear debug log", callback: () => this.panel.clear() });
+	}
+
+	/** Apply and persist a change to one setting. Used by the settings tab, commands and controls. */
+	async updateSetting<K extends keyof PenGlyphsSettings>(key: K, value: PenGlyphsSettings[K]): Promise<void> {
+		this.settings[key] = value;
+		await this.saveData(this.settings);
+		if (key === "glyphMode") {
+			this.panel.log(`---- glyph mode ${value ? "on" : "off"} ----`);
+			this.panel.refreshActions();
+		} else if (key === "showDebugPanel") {
+			if (value) this.panel.show();
+			else this.panel.hide();
+		}
 	}
 
 	private onStroke(stroke: PenStroke): void {
@@ -112,12 +117,19 @@ export default class PenGlyphsPlugin extends Plugin {
 		if (stroke.kind === "tap") {
 			this.overlay.end(stroke, false);
 			const done = this.runOnCanvas(stroke, "tap");
-			this.panel.log(`tap at (${Math.round(first.x)},${Math.round(first.y)}) on ${describe(stroke.target)}: ${done}`);
+			this.panel.log(`tap at (${Math.round(first.x)},${Math.round(first.y)}) on ${describe(stroke.target)}: ${logText(done)}`);
 			return;
 		}
 		const result = this.recognizer.recognize(stroke.points);
 		this.overlay.end(stroke, result.glyph !== null);
-		const done = result.glyph ? ` → ${this.runOnCanvas(stroke, result.glyph)}` : "";
+		let done = "";
+		if (result.glyph) {
+			const outcome = this.runOnCanvas(stroke, result.glyph);
+			this.flash.show(outcome.label);
+			done = ` → ${logText(outcome)}`;
+		} else if (this.settings.showMisses) {
+			this.flash.show("?", "miss");
+		}
 		const s = strokeStats(stroke.points);
 		this.panel.log(
 			`${result.glyph ? "✓" : "?"} ${describeRecognition(result)}${done}\n` +
@@ -127,18 +139,18 @@ export default class PenGlyphsPlugin extends Plugin {
 	}
 
 	/** Run a glyph's command on the canvas the stroke was drawn on; returns what happened. */
-	private runOnCanvas(stroke: PenStroke, gesture: CanvasGesture): string {
+	private runOnCanvas(stroke: PenStroke, gesture: CanvasGesture): Outcome {
 		const canvas = CanvasAdapter.from(canvasViewFor(this.app, stroke.target));
 		if (!(canvas instanceof CanvasAdapter)) {
-			const message = `Canvas internals unavailable (missing: ${canvas.missing.join(", ")})`;
-			new Notice(`Pen Glyphs: ${message}`);
-			return message;
+			const detail = `missing: ${canvas.missing.join(", ")}`;
+			new Notice(`Pen Glyphs: canvas internals unavailable (${detail})`);
+			return { label: "canvas unavailable", detail };
 		}
 		try {
 			return runCanvasGlyph(canvas, gesture, stroke.points);
 		} catch (err) {
 			new Notice(`Pen Glyphs: ${gesture} failed: ${String(err)}`);
-			return `failed: ${String(err)}`;
+			return { label: `${gesture} failed`, detail: String(err) };
 		}
 	}
 
@@ -170,12 +182,8 @@ export default class PenGlyphsPlugin extends Plugin {
 	}
 
 	private async toggleGlyphMode(): Promise<void> {
-		this.settings.glyphMode = !this.settings.glyphMode;
-		await this.saveData(this.settings);
-		const state = this.settings.glyphMode ? "on" : "off";
-		this.panel.log(`---- glyph mode ${state} ----`);
-		this.panel.refreshActions();
-		new Notice(`Pen glyphs ${state}`);
+		await this.updateSetting("glyphMode", !this.settings.glyphMode);
+		new Notice(`Pen glyphs ${this.settings.glyphMode ? "on" : "off"}`);
 	}
 
 	private async saveLog(): Promise<void> {
@@ -185,4 +193,8 @@ export default class PenGlyphsPlugin extends Plugin {
 			`- ${navigator.userAgent}`;
 		await this.panel.saveToVault(header);
 	}
+}
+
+function logText(outcome: Outcome): string {
+	return outcome.detail ? `${outcome.label} (${outcome.detail})` : outcome.label;
 }

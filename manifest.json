@@ -1,7 +1,7 @@
 {
   "id": "pen-glyphs",
   "name": "Pen Glyphs",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "minAppVersion": "1.5.0",
   "description": "Apple Pencil glyph commands for Canvas on iPad.",
   "author": "Matt Tenenbaum",

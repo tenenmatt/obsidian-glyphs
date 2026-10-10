@@ -63,10 +63,12 @@ Single strokes, recognized the moment the pen lifts (`src/recognize/`). Each gly
 
 1. Bounding-box diagonal under 24 px: not a glyph.
 2. Straightness (end-to-end distance / path length) ≥ 0.85: **line**.
-3. Closes on itself (either end comes back near the other end's first/last 30% of the path): a loop. Too much ink for one loop (> 1.25× the bounding-box perimeter) is a scribble-out → none. Otherwise count sharp corners: 0–2 → **lasso**; 3–5 and rectangular (convex hull fills ≥ 0.7 of the bounding box) → **square**; anything else → none.
-4. Otherwise **$P** (ported from the reference implementation, BSD notice kept) against built-in templates for **x**, **caret** and **v**; nearest template within distance 1.15 wins, else none. $P is orientation-sensitive, which tells caret from v.
+3. Closes on itself (either end comes back near the other end's first/last 30% of the path): a loop. Too much ink for one loop (> 1.25× the bounding-box perimeter) is a scribble-out → none. Otherwise count sharp corners: 0–2 → **lasso**; 3–4 and rectangular (convex hull fills ≥ 0.7 of the bounding box) → **square**; anything else → none.
+4. Otherwise **$P** (ported from the reference implementation, BSD notice kept) against built-in templates for **x**, **caret** and **v**. The nearest template wins if within its glyph's limit (caret 0.95, v 1.22, x 1.38), else none. $P is orientation-sensitive, which tells caret from v.
 
-Thresholds were tuned on 105 fixtures recorded on the author's iPad (`test/fixtures/gestures.json`, imported by `scripts/import-fixtures.mjs`). Templates are generated from every other x/caret/v fixture by `scripts/build-templates.ts`; the test suite requires every held-out fixture to be recognized correctly and every scribble rejected. Templates are the author's own strokes, so an idealized textbook x is (correctly, for now) not recognized; v2 lets users record their own.
+Thresholds were tuned on fixtures recorded on the author's iPad (`test/fixtures/gestures.json`, imported by `scripts/import-fixtures.mjs`). Every x/caret/v fixture is a built-in template (`scripts/build-templates.ts`). Accuracy is tested leave-one-out: each fixture must be recognized by templates built from all the others, and every scribble rejected. Per-glyph distance limits sit midway between the furthest real fixture and the nearest scribble under that measure. Recognition takes ~3 ms per stroke on a Mac with 55 templates. Templates are the author's own strokes; v2 lets users record their own.
+
+**Improving recognition:** when a glyph is misread, save it as a fixture with the intended label, re-import, rebuild templates, and re-check the limits against the leave-one-out distances.
 
 Misses gray out the ink; hits clear it almost immediately. The debug panel logs each result with the nearest alternatives.
 

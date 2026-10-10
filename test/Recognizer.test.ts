@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Recognizer, describeRecognition, thresholds } from "../src/recognize/Recognizer";
-import { TEMPLATES, TEMPLATE_SOURCES } from "../src/recognize/templates";
+import { normalize } from "../src/recognize/pdollar";
+import { TEMPLATES } from "../src/recognize/templates";
 import { polyline, shapes } from "./shapes";
 
 const recognizer = new Recognizer(TEMPLATES);
@@ -46,17 +47,21 @@ describe("template matching", () => {
 		expect(glyphOf(shapes.v())).toBe("v");
 	});
 
-	it("matches the author's x, not an idealized one", () => {
-		// Templates come from the author's own strokes, whose x has a curved return
-		// stroke; a ruler-straight x is too far from them. Held-out real x's are
-		// checked in the accuracy suite below.
-		expect(recognizer.recognize(shapes.x())).toMatchObject({ glyph: null, reason: expect.stringMatching(/^nearest x/) });
+	it("recognizes a ruler-straight x, though templates are the author's curved ones", () => {
+		expect(glyphOf(shapes.x())).toBe("x");
 	});
 
 	it("rejects an open stroke that matches nothing well", () => {
 		const r = recognizer.recognize(shapes.zigzag());
 		expect(r.glyph).toBeNull();
-		expect(r.matches![0].distance).toBeGreaterThan(thresholds.maxDistance);
+		const best = r.matches![0];
+		expect(best.distance).toBeGreaterThan(thresholds.maxDistance[best.name]);
+	});
+
+	it("never accepts a template for a glyph with no distance limit", () => {
+		const caret = normalize(shapes.caret().map((p) => ({ x: p.x, y: p.y, id: 1 })));
+		const r = new Recognizer([{ name: "mystery", points: caret }]).recognize(shapes.caret());
+		expect(r).toMatchObject({ glyph: null, reason: "nearest mystery at 0.00" });
 	});
 
 	it("reports no match when it has no templates", () => {
@@ -107,20 +112,27 @@ describe("templates", () => {
 	});
 });
 
-// The accuracy bar: every real glyph recorded on the iPad that was not used as
-// a template must be recognized, and every scribble rejected.
-describe("accuracy on recorded Pencil fixtures", () => {
+// The accuracy bar, measured leave-one-out: each stroke recorded on the iPad
+// must be recognized correctly by templates built from all the *other*
+// fixtures, and every scribble must be rejected.
+describe("accuracy on recorded Pencil fixtures (leave-one-out)", () => {
 	type Gesture = { id: string; label: string; strokes: number[][][] };
 	const gestures: Gesture[] = JSON.parse(readFileSync("test/fixtures/gestures.json", "utf8"));
-	const heldOut = gestures.filter((g) => !TEMPLATE_SOURCES.includes(g.id));
+	const points = (g: Gesture) => g.strokes[0].map(([x, y]) => ({ x, y }));
+	const templateFor = new Map(
+		gestures
+			.filter((g) => ["x", "caret", "v"].includes(g.label))
+			.map((g) => [g.id, { name: g.label, points: normalize(points(g).map((p) => ({ ...p, id: 1 }))) }]),
+	);
 
-	it("has fixtures for every glyph and some scribbles", () => {
-		const labels = new Set(heldOut.map((g) => g.label));
-		expect([...labels].sort()).toEqual(["caret", "lasso", "line", "other", "square", "v", "x"]);
+	it("has fixtures for every glyph and some scribbles, and a built-in template for each x/caret/v", () => {
+		expect([...new Set(gestures.map((g) => g.label))].sort()).toEqual(["caret", "lasso", "line", "other", "square", "v", "x"]);
+		expect(TEMPLATES).toHaveLength(templateFor.size);
 	});
 
-	it.each(heldOut.map((g) => [g.id, g] as const))("%s", (_id, g) => {
-		const r = recognizer.recognize(g.strokes[0].map(([x, y]) => ({ x, y })));
+	it.each(gestures.map((g) => [g.id, g] as const))("%s", (_id, g) => {
+		const others = [...templateFor].filter(([id]) => id !== g.id).map(([, t]) => t);
+		const r = new Recognizer(others).recognize(points(g));
 		expect(r.glyph ?? "other").toBe(g.label);
 	});
 });

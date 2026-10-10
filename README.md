@@ -25,7 +25,7 @@ Check that the debug panel title reads the expected version. Then, on a canvas w
 
 1. Draw each glyph several times: x, lasso (around cards), caret (^), v, square (on empty space), line (card to card). Each should log `✓ <glyph>` and its ink should vanish almost at once.
 2. Draw some scribbles and letters. They should log `? no glyph` and their ink should turn gray, linger, then fade.
-3. When something is misread, press **save stroke** and label it with what you meant. Those fixtures become new test cases: `node scripts/import-fixtures.mjs`, then `node scripts/build-templates.ts` if templates should change.
+3. When something is misread, press **save stroke** and label it with what you meant. Those fixtures become new test cases and templates: `node scripts/import-fixtures.mjs`, then `node scripts/build-templates.ts`.
 
 ## Test protocol (milestone 2)
 

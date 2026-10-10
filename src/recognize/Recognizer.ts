@@ -4,7 +4,7 @@
 // (see SPEC.md "Recognition" and test/fixtures/gestures.json):
 //   too small               -> none
 //   nearly straight         -> line
-//   closes on itself        -> square (3-5 corners, rectangular) or lasso (0-2 corners)
+//   closes on itself        -> square (3-4 corners, rectangular) or lasso (0-2 corners)
 //   anything else           -> $P template match among x / caret / v
 // $P is orientation-sensitive, which is what tells caret from v.
 
@@ -26,13 +26,18 @@ export const thresholds = {
 	closedBelow: 0.1,
 	/** One loop inks 0.8-1.05x its bounding-box perimeter; a scribble-out 3.7x. */
 	maxLoopInk: 1.25,
-	/** Squares show 3-4 corners, lassos 0-2, wobbly blobs 6+. */
+	/** Squares show 3-4 corners, lassos 0-2, loopy scribbles and blobs 5+. */
 	squareCorners: 3,
-	squareMaxCorners: 5,
+	squareMaxCorners: 4,
 	/** Squares fill 0.75-0.97 of their bounding box; a triangle 0.55. */
 	squareHullFill: 0.7,
-	/** Real x/caret/v fixtures match within 1.06; open scribbles are 1.26 or more away. */
-	maxDistance: 1.15,
+	/**
+	 * Furthest a $P match may be, per glyph: midway between the furthest real
+	 * fixture and the nearest scribble, measured leave-one-out (each fixture
+	 * against templates built from all the others). caret: 0.73 vs 1.13;
+	 * v: 1.14 vs 1.32; x: 1.25 vs 1.55.
+	 */
+	maxDistance: { caret: 0.95, v: 1.22, x: 1.38 } as Record<string, number>,
 };
 
 export class Recognizer {
@@ -55,7 +60,8 @@ export class Recognizer {
 		);
 		const best = matches[0];
 		if (!best) return { glyph: null, reason: "no templates", matches };
-		if (best.distance > thresholds.maxDistance) {
+		const limit = thresholds.maxDistance[best.name];
+		if (limit === undefined || best.distance > limit) {
 			return { glyph: null, reason: `nearest ${best.name} at ${fmt(best.distance)}`, matches };
 		}
 		return { glyph: best.name as GlyphName, detail: `$P distance ${fmt(best.distance)}`, matches };

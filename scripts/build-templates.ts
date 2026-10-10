@@ -1,6 +1,6 @@
 // Generates src/recognize/templates.ts from test/fixtures/gestures.json.
-// Every other fixture of each template glyph (in id order) becomes a built-in
-// template; the rest are held out so tests measure accuracy on unseen strokes.
+// Every fixture of each template glyph becomes a built-in template. Tests
+// measure accuracy leave-one-out: each fixture against all the others.
 //
 //   node scripts/build-templates.ts
 import { readFileSync, writeFileSync } from "node:fs";
@@ -12,12 +12,9 @@ type Gesture = { id: string; label: string; strokes: number[][][] };
 const gestures: Gesture[] = JSON.parse(readFileSync("test/fixtures/gestures.json", "utf8"));
 
 const lines: string[] = [];
-const sources: string[] = [];
 for (const glyph of TEMPLATE_GLYPHS) {
 	const own = gestures.filter((g) => g.label === glyph).sort((a, b) => a.id.localeCompare(b.id));
-	own.forEach((g, i) => {
-		if (i % 2 !== 0) return;
-		sources.push(g.id);
+	own.forEach((g) => {
 		const cloud = normalize(g.strokes.flatMap((s, k) => s.map(([x, y]) => ({ x, y, id: k + 1 }))));
 		const flat = cloud.flatMap((p) => [Math.round(p.x * 1000) / 1000, Math.round(p.y * 1000) / 1000]);
 		lines.push(`\t// ${g.id}\n\tt(${JSON.stringify(glyph)}, ${JSON.stringify(flat)}),`);
@@ -40,9 +37,6 @@ function t(name: string, xy: number[]): Template {
 export const TEMPLATES: Template[] = [
 ${lines.join("\n")}
 ];
-
-/** Fixture ids the templates came from; tests hold out every other fixture. */
-export const TEMPLATE_SOURCES: string[] = ${JSON.stringify(sources, null, "\t")};
 `,
 );
 console.log(`wrote ${lines.length} templates`);

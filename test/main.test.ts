@@ -74,7 +74,7 @@ describe("activation", () => {
 		const plugin = await load();
 		expect(plugin.settings).toEqual({ glyphMode: true, showDebugPanel: true });
 		expect(document.querySelector(".pen-glyphs-overlay")).not.toBeNull();
-		expect(panelText()).toContain("loaded 9.9.9; glyph mode on");
+		expect(panelText()).toContain("loaded test-build; glyph mode on");
 	});
 
 	it("restores saved settings", async () => {
@@ -184,7 +184,7 @@ describe("commands and controls", () => {
 		await plugin.runCommand("save-debug-log");
 		const vault = plugin.app.vault as unknown as FakeVault;
 		const saved = vault.files.get("pen-glyphs-logs/2026-10-09 12-00-00.md")!;
-		expect(saved).toContain("- plugin 9.9.9, glyph mode at save: on");
+		expect(saved).toContain("- plugin test-build, glyph mode at save: on");
 
 		vault.files.clear();
 		await plugin.runCommand("toggle-glyph-mode");
@@ -197,7 +197,7 @@ describe("commands and controls", () => {
 		const plugin = await load();
 		const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
 		await plugin.runCommand("copy-debug-log");
-		expect(write).toHaveBeenCalledWith(expect.stringContaining("loaded 9.9.9"));
+		expect(write).toHaveBeenCalledWith(expect.stringContaining("loaded test-build"));
 
 		plugin.runCommand("clear-debug-log");
 		expect(panelText()).toBe("");

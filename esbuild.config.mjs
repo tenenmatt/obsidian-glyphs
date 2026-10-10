@@ -6,6 +6,9 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const prod = process.argv[2] === "production";
+// Compiled into the bundle, so the code reports the version it was built as,
+// even if Sync has since replaced manifest.json on disk.
+const version = JSON.parse(readFileSync("manifest.json", "utf8")).version;
 const PLUGIN_FILES = ["main.js", "manifest.json", "styles.css"];
 
 function pluginDir() {
@@ -38,6 +41,7 @@ const ctx = await esbuild.context({
   outfile: "build/main.js",
   sourcemap: prod ? false : "inline",
   minify: prod,
+  define: { __PLUGIN_VERSION__: JSON.stringify(version) },
   logLevel: "info",
   plugins: [{
     name: "deploy",

@@ -93,7 +93,7 @@ describe("panel", () => {
 
 	it("shows the running plugin version in its title", () => {
 		makePanel().show();
-		expect(document.querySelector(".pen-glyphs-debug-title")!.textContent).toBe("pen-glyphs test");
+		expect(document.querySelector(".pen-glyphs-debug-title")!.textContent).toBe("pen-glyphs test-build");
 	});
 
 	it("only creates one panel when shown twice", () => {

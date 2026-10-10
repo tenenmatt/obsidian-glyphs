@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+	define: { __PLUGIN_VERSION__: JSON.stringify("test-build") },
 	resolve: {
 		// The obsidian package only ships type definitions; tests run against a fake.
 		alias: { obsidian: fileURLToPath(new URL("./test/obsidian.ts", import.meta.url)) },

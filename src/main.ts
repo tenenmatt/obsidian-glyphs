@@ -43,7 +43,7 @@ export default class PenGlyphsPlugin extends Plugin {
 		]);
 		if (this.settings.showDebugPanel) this.panel.show();
 		this.register(() => this.panel.hide());
-		this.panel.log(`loaded ${this.manifest.version}; glyph mode ${this.settings.glyphMode ? "on" : "off"}`);
+		this.panel.log(`loaded ${__PLUGIN_VERSION__}; glyph mode ${this.settings.glyphMode ? "on" : "off"}`);
 
 		this.overlay = new Overlay();
 		this.register(() => this.overlay.destroy());
@@ -124,7 +124,7 @@ export default class PenGlyphsPlugin extends Plugin {
 	private async saveLog(): Promise<void> {
 		const header =
 			`# Pen Glyphs debug log\n\n` +
-			`- plugin ${this.manifest.version}, glyph mode at save: ${this.settings.glyphMode ? "on" : "off"}\n` +
+			`- plugin ${__PLUGIN_VERSION__}, glyph mode at save: ${this.settings.glyphMode ? "on" : "off"}\n` +
 			`- ${navigator.userAgent}`;
 		await this.panel.saveToVault(header);
 	}

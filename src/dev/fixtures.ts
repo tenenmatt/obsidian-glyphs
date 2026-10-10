@@ -11,7 +11,7 @@ const FIXTURE_FOLDER = "pen-glyphs-fixtures";
 // the same gesture (e.g. the two strokes of an X).
 const GESTURE_GAP_MS = 500;
 const KEEP_STROKES = 20;
-const QUICK_LABELS = ["x", "lasso", "c", "caret", "line", "other"];
+const QUICK_LABELS = ["x", "lasso", "caret", "v", "line", "other"];
 
 export class GestureLog {
 	private strokes: PenStroke[] = [];

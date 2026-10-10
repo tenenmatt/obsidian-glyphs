@@ -24,7 +24,7 @@ On a canvas with a few cards, with glyph mode on (ribbon pen icon, the `glyphs:`
 3. Hover the pen near the screen. A faint dot should follow it and disappear when you move the pen away.
 4. Fingers: pan, pinch, drag a card, double-tap to edit, Scribble inside a card. All should work as before.
 5. The canvas zoom buttons and card toolbar should still respond to the pen (the panel logs `passed through`).
-6. Draw an X, then press **save stroke** and pick `x`. Do the same for a lasso and a few others. Fixtures land in `pen-glyphs-fixtures/`.
+6. Draw an X, then press **save stroke** and pick `x`. Do the same for a lasso, a caret (^), a V, and a few others. Fixtures land in `pen-glyphs-fixtures/`.
 7. Toggle glyph mode off: the pen should behave as it does without the plugin.
 
 The milestone 1 input spike (blocking-mode experiments) lives in git history at `6d2f391`; its findings are in SPEC.md.

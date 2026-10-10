@@ -70,12 +70,14 @@ src/
 |---|---|---|
 | X | a node | Delete node(s) under the X |
 | Lasso (closed loop) | any area | Select nodes whose centers are inside the loop |
-| C | a node or selection | Copy |
-| Caret ^ | empty space | Paste at the caret's point |
+| Caret ^ | a node or selection | Copy (Allume's model) |
+| V | empty space | Paste at the V's point (Allume's model) |
 | Pen tap | a node | Select node |
 | Horizontal line through 2+ nodes | nodes | Connect them with edges, in stroke order (stretch goal) |
 
-Targets are resolved by hit-testing the gesture's bounding box (X, C) or start point (^) against node bounds, converted from client to canvas coordinates through `CanvasAdapter`. If the gesture hits the current selection, apply the command to the whole selection.
+Caret and V are mirror images, so the recognizer must stay orientation-sensitive ($P is, as long as we don't add rotation invariance).
+
+Targets are resolved by hitting the gesture's bounding box (X, ^) or its point (V: the bottom vertex) against node bounds, converted from client to canvas coordinates through `CanvasAdapter`. If the gesture hits the current selection, apply the command to the whole selection.
 
 Every destructive action must be undoable. Use Canvas's own history if reachable through the adapter; otherwise snapshot the canvas data before the change and register an undo.
 
@@ -85,7 +87,7 @@ Every destructive action must be undoable. Use Canvas's own history if reachable
 |---|---|---|
 | Strike-through (horizontal line) | text | Delete the struck range |
 | Lasso | text | Select enclosed range |
-| Caret ^ | between characters | Place cursor there and open the keyboard |
+| Caret ^ | between characters | Place cursor there and open the keyboard (open question: conflicts with caret = copy on Canvas; revisit before v2) |
 
 Use CodeMirror 6's `EditorView.posAtCoords` to map points to document positions, and transactions for edits. Requires resolving the Scribble conflict.
 

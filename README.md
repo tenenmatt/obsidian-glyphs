@@ -2,7 +2,7 @@
 
 Apple Pencil glyph commands for Obsidian Canvas on iPad. See [SPEC.md](SPEC.md).
 
-**Status: milestone 3 (recognizer).** On iPad, pen strokes on Canvas are recognized as x, lasso, caret, v, square or line; the debug panel shows each result. No commands run yet. Fingers behave normally; elsewhere the plugin stays inactive.
+**Status: milestone 4 (canvas commands).** On iPad, pen glyphs act on Canvas: lasso selects, X deletes, square creates a card, a line connects two cards, a pen tap selects. Copy/paste (caret, v) come later. Fingers behave normally; elsewhere the plugin stays inactive.
 
 ## Dev setup
 
@@ -18,6 +18,18 @@ node scripts/build-templates.ts            # regenerate src/recognize/templates.
 ```
 
 With Obsidian Sync, desktop Obsidian must have the test vault open to upload changes, and both devices need **Settings → Sync → Installed community plugins** and **Active community plugin list** turned on. On the iPad, reload the plugin by toggling it under Community plugins or by running "Reload app without saving".
+
+## Test protocol (milestone 4)
+
+Check the debug panel title shows the expected version. Use a test canvas you don't mind changing. Each command logs `→ <what happened>` in the panel.
+
+1. **Tap** a card with the pen: it's selected. Tap empty canvas: selection clears.
+2. **Lasso** around two or three cards: exactly the cards whose centers are inside get selected. Lasso around nothing: selection clears. A squarish loop around cards also selects (it doesn't make a card).
+3. **Square** on empty space: a new card fills it and opens for editing; Scribble into it.
+4. **Line** from one card to another, in various directions: an arrow connects them, pointing at the card where the stroke ended. A line that doesn't start and end on two cards does nothing.
+5. **X** over an unselected card: it's deleted. Select several cards, X one of them: all selected cards are deleted. X over empty canvas: nothing.
+6. **Undo** (Canvas's undo button) after each of the above reverts it.
+7. Fingers, Scribble inside cards, and the canvas controls still work.
 
 ## Test protocol (milestone 3)
 

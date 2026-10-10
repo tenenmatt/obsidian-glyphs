@@ -128,3 +128,14 @@ export function polygonArea(poly: Pt[]): number {
 function dist(a: Pt, b: Pt): number {
 	return Math.hypot(b.x - a.x, b.y - a.y);
 }
+
+/** Whether `p` lies inside the polygon (ray casting; the polygon closes itself). */
+export function pointInPolygon(p: Pt, poly: Pt[]): boolean {
+	let inside = false;
+	for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+		const a = poly[i];
+		const b = poly[j];
+		if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+	}
+	return inside;
+}

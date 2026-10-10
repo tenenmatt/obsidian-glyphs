@@ -7,6 +7,7 @@ import {
 	hullFill,
 	inkRatio,
 	pathLength,
+	pointInPolygon,
 	polygonArea,
 	straightness,
 } from "../src/recognize/features";
@@ -93,5 +94,29 @@ describe("corners", () => {
 		// puts a peak on the last measured turn.
 		expect(corners(shapes.caret())).toBe(1);
 		expect(corners(shapes.hookedLine())).toBe(1);
+	});
+});
+
+describe("pointInPolygon", () => {
+	const triangle = [
+		{ x: 0, y: 0 },
+		{ x: 100, y: 0 },
+		{ x: 0, y: 100 },
+	];
+
+	it("tells inside from outside, including inside the bounding box", () => {
+		expect(pointInPolygon({ x: 10, y: 10 }, triangle)).toBe(true);
+		expect(pointInPolygon({ x: 80, y: 80 }, triangle)).toBe(false);
+		expect(pointInPolygon({ x: -5, y: 10 }, triangle)).toBe(false);
+	});
+
+	it("treats a stroke as closing back to its start", () => {
+		const openSquare = [
+			{ x: 0, y: 0 },
+			{ x: 100, y: 0 },
+			{ x: 100, y: 100 },
+			{ x: 0, y: 100 },
+		];
+		expect(pointInPolygon({ x: 50, y: 50 }, openSquare)).toBe(true);
 	});
 });

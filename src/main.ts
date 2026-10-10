@@ -1,4 +1,5 @@
 import { Notice, Platform, Plugin } from "obsidian";
+import { CanvasGesture, runCanvasGlyph } from "./commands/canvasCommands";
 import { saveCanvasProbe, saveCanvasReport } from "./dev/canvasInspector";
 import { GestureLog, SaveFixtureModal } from "./dev/fixtures";
 import { Overlay } from "./input/Overlay";
@@ -6,6 +7,7 @@ import { PenCapture } from "./input/PenCapture";
 import { PenStroke, strokeStats } from "./input/strokes";
 import { Recognizer, describeRecognition } from "./recognize/Recognizer";
 import { TEMPLATES } from "./recognize/templates";
+import { CanvasAdapter, canvasViewFor } from "./targets/CanvasAdapter";
 import { DebugPanel } from "./ui/DebugPanel";
 import { describe } from "./util/dom";
 
@@ -109,17 +111,35 @@ export default class PenGlyphsPlugin extends Plugin {
 		const first = stroke.points[0];
 		if (stroke.kind === "tap") {
 			this.overlay.end(stroke, false);
-			this.panel.log(`tap at (${Math.round(first.x)},${Math.round(first.y)}) on ${describe(stroke.target)}`);
+			const done = this.runOnCanvas(stroke, "tap");
+			this.panel.log(`tap at (${Math.round(first.x)},${Math.round(first.y)}) on ${describe(stroke.target)}: ${done}`);
 			return;
 		}
 		const result = this.recognizer.recognize(stroke.points);
 		this.overlay.end(stroke, result.glyph !== null);
+		const done = result.glyph ? ` → ${this.runOnCanvas(stroke, result.glyph)}` : "";
 		const s = strokeStats(stroke.points);
 		this.panel.log(
-			`${result.glyph ? "✓" : "?"} ${describeRecognition(result)}\n` +
+			`${result.glyph ? "✓" : "?"} ${describeRecognition(result)}${done}\n` +
 				`    ${stroke.points.length} pts, ${Math.round(s.ms)}ms, length ${Math.round(s.length)}px,` +
 				` box ${Math.round(s.width)}×${Math.round(s.height)}, max pressure ${s.maxPressure.toFixed(2)}`,
 		);
+	}
+
+	/** Run a glyph's command on the canvas the stroke was drawn on; returns what happened. */
+	private runOnCanvas(stroke: PenStroke, gesture: CanvasGesture): string {
+		const canvas = CanvasAdapter.from(canvasViewFor(this.app, stroke.target));
+		if (!(canvas instanceof CanvasAdapter)) {
+			const message = `Canvas internals unavailable (missing: ${canvas.missing.join(", ")})`;
+			new Notice(`Pen Glyphs: ${message}`);
+			return message;
+		}
+		try {
+			return runCanvasGlyph(canvas, gesture, stroke.points);
+		} catch (err) {
+			new Notice(`Pen Glyphs: ${gesture} failed: ${String(err)}`);
+			return `failed: ${String(err)}`;
+		}
 	}
 
 	private async inspectCanvas(): Promise<void> {

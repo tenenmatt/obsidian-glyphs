@@ -92,6 +92,18 @@ Targets are resolved by hitting the gesture's bounding box (X, ^) or its point (
 
 Every destructive action must be undoable. Use Canvas's own history if reachable through the adapter; otherwise snapshot the canvas data before the change and register an undo.
 
+## Canvas internals
+
+Confirmed on Obsidian 1.14.4 (desktop) with the "Inspect canvas internals" and "Probe canvas behavior" dev commands; all access lives in `src/targets/CanvasAdapter.ts`, which reports missing methods instead of failing mid-command.
+
+- Coordinates: `canvas.posFromClient({x, y})` converts client to canvas coordinates. Cards store top-left `x, y, width, height`.
+- Hit-testing: `hitTestNode(pos)` (topmost card at a point), `getIntersectingNodes({minX, minY, maxX, maxY})`.
+- Selection: `selection` (Set), `selectOnly`, `selectAll(items)`, `deselectAll`.
+- Delete: `removeNode(node)` (also removes its edges), `deleteSelection()`.
+- Create: `createTextNode({pos, size, text, focus, save})`. `pos` is the top-left corner. `focus` (default true) selects the card and calls `startEditing()`.
+- Connect: no create-edge method. `importData({nodes: [], edges: [edge]})` adds an edge; without its second (`clear`) argument it never removes anything. Omitted `fromSide`/`toSide` are chosen by Canvas.
+- Undo: `requestSave()` records a history entry (debounced), so Canvas's own undo/redo reverts glyph commands. `createTextNode` saves unless `save: false`.
+
 ## Editor (v2)
 
 | Glyph | Over | Command |
@@ -132,7 +144,7 @@ A modal opened by a command palette entry ("Pen Glyphs: Show cheatsheet") and op
 
 1. ✅ **Input spike:** on iPad, log `pointerType` for pen vs finger on a Canvas, and confirm `preventDefault` on pen stops panning while fingers still pan. *This validates the whole approach; stop and reassess if it fails.*
 2. ✅ Stroke overlay rendering, hover dot, fixture recording.
-3. Recognizer with X and lasso; debug panel showing scores.
+3. ✅ Recognizer (x, lasso, caret, v, square, line); debug panel showing results.
 4. `CanvasAdapter` and canvas commands: lasso select, X delete (with undo), square new card, line connect, pen tap select. Starts with a dev command that dumps the Canvas internals available in the running Obsidian version.
 5. Flash notices and cheatsheet.
 6. Copy/paste glyphs, settings, glyph-mode toggle.

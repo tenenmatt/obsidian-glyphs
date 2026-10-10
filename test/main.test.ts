@@ -4,6 +4,7 @@ import PenGlyphsPlugin from "../src/main";
 import { MISS_COLOR } from "../src/input/Overlay";
 import { PenPoint } from "../src/input/strokes";
 import { canvasView, fakeContext, manualFrames, pointer } from "./helpers";
+import { FakeCanvas } from "./fakeCanvas";
 import { shapes } from "./shapes";
 
 type TestPlugin = PenGlyphsPlugin & {
@@ -183,6 +184,60 @@ describe("pen input", () => {
 		const { card } = canvasView();
 		const down = pointer(card, "pointerdown");
 		expect(down.defaultPrevented).toBe(false);
+	});
+});
+
+describe("glyphs on a canvas", () => {
+	/** A canvas view in the DOM, registered as a workspace leaf with fake internals. */
+	async function canvasPlugin(internals: unknown = new FakeCanvas()) {
+		const plugin = await load();
+		const view = canvasView();
+		(plugin.app.workspace as unknown as FakeWorkspace).leaves = [{ view: { containerEl: view.leaf, canvas: internals } }];
+		return { plugin, view, canvas: internals as FakeCanvas };
+	}
+
+	it("a pen tap selects the card under it", async () => {
+		const { view, canvas } = await canvasPlugin();
+		const card = canvas.addCard(0, 0);
+		pointer(view.wrapper, "pointerdown", { x: 20, y: 20, t: 0 });
+		pointer(view.wrapper, "pointerup", { x: 20, y: 20, t: 50 });
+		expect([...canvas.selection]).toEqual([card]);
+		expect(panelText()).toContain("tap at (20,20) on div.canvas-wrapper: selected card");
+	});
+
+	it("a recognized glyph runs its command and logs the outcome", async () => {
+		const { view, canvas } = await canvasPlugin();
+		drawStroke(view.wrapper, shapes.square());
+		expect(canvas.nodes.size).toBe(1);
+		expect(panelText()).toMatch(/✓ square \(closed, \d corners, fill \d\.\d\d\) → new card/);
+	});
+
+	it("an unrecognized stroke runs nothing", async () => {
+		const { view, canvas } = await canvasPlugin();
+		drawStroke(view.wrapper, shapes.zigzag());
+		expect(canvas.nodes.size).toBe(0);
+		expect(panelText()).not.toContain("→");
+	});
+
+	it("explains when the canvas internals it needs are missing", async () => {
+		const { view } = await canvasPlugin({ nodes: new Map() });
+		pointer(view.wrapper, "pointerdown", { t: 0 });
+		pointer(view.wrapper, "pointerup", { t: 50 });
+		const message = "Canvas internals unavailable (missing: posFromClient, hitTestNode, getIntersectingNodes, selectOnly, selectAll, deselectAll, removeNode, deleteSelection, requestSave, createTextNode, importData, selection)";
+		expect(Notice.shown).toEqual([`Pen Glyphs: ${message}`]);
+		expect(panelText()).toContain(message);
+	});
+
+	it("reports a command that throws", async () => {
+		const canvas = new FakeCanvas();
+		canvas.hitTestNode = () => {
+			throw new Error("boom");
+		};
+		const { view } = await canvasPlugin(canvas);
+		pointer(view.wrapper, "pointerdown", { t: 0 });
+		pointer(view.wrapper, "pointerup", { t: 50 });
+		expect(Notice.shown).toEqual(["Pen Glyphs: tap failed: Error: boom"]);
+		expect(panelText()).toContain("failed: Error: boom");
 	});
 });
 

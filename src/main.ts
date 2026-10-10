@@ -1,5 +1,5 @@
 import { Notice, Platform, Plugin } from "obsidian";
-import { CanvasGesture, Outcome, runCanvasGlyph } from "./commands/canvasCommands";
+import { CanvasGesture, Clipboard, Outcome, runCanvasGlyph } from "./commands/canvasCommands";
 import { saveCanvasProbe, saveCanvasReport } from "./dev/canvasInspector";
 import { GestureLog, SaveFixtureModal } from "./dev/fixtures";
 import { Overlay } from "./input/Overlay";
@@ -20,6 +20,7 @@ export default class PenGlyphsPlugin extends Plugin {
 	private overlay!: Overlay;
 	private flash!: Flash;
 	private gestures = new GestureLog();
+	private clipboard: Clipboard = { data: null };
 	private recognizer = new Recognizer(TEMPLATES);
 
 	override async onload(): Promise<void> {
@@ -147,7 +148,7 @@ export default class PenGlyphsPlugin extends Plugin {
 			return { label: "canvas unavailable", detail };
 		}
 		try {
-			return runCanvasGlyph(canvas, gesture, stroke.points);
+			return runCanvasGlyph(canvas, gesture, stroke.points, this.clipboard);
 		} catch (err) {
 			new Notice(`Pen Glyphs: ${gesture} failed: ${String(err)}`);
 			return { label: `${gesture} failed`, detail: String(err) };

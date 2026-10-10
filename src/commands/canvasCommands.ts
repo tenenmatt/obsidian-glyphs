@@ -3,9 +3,14 @@
 
 import { Pt, bounds, pointInPolygon } from "../recognize/features";
 import { GlyphName } from "../recognize/Recognizer";
-import { CanvasAdapter, CanvasNode, Rect, Side } from "../targets/CanvasAdapter";
+import { CanvasAdapter, CanvasNode, Rect, SelectionData, Side } from "../targets/CanvasAdapter";
 
 export type CanvasGesture = GlyphName | "tap";
+
+/** The plugin's own clipboard: what the last caret copied. */
+export interface Clipboard {
+	data: SelectionData | null;
+}
 
 /** What a command did: `label` is shown in the flash notice, `detail` only in the debug log. */
 export interface Outcome {
@@ -17,7 +22,7 @@ export interface Outcome {
  * Run the command for a recognized glyph drawn at `client` points (in client
  * coordinates). Labels use the command names from the cheatsheet.
  */
-export function runCanvasGlyph(canvas: CanvasAdapter, gesture: CanvasGesture, client: Pt[]): Outcome {
+export function runCanvasGlyph(canvas: CanvasAdapter, gesture: CanvasGesture, client: Pt[], clipboard: Clipboard): Outcome {
 	const points = client.map((p) => canvas.toCanvas(p));
 	switch (gesture) {
 		case "tap":
@@ -30,9 +35,28 @@ export function runCanvasGlyph(canvas: CanvasAdapter, gesture: CanvasGesture, cl
 		case "line":
 			return line(canvas, points);
 		case "caret":
+			return copy(canvas, points, clipboard);
 		case "v":
-			return { label: `${gesture === "caret" ? "copy" : "paste"} (coming soon)` };
+			return paste(canvas, points, clipboard);
 	}
+}
+
+/** Copy the card under the caret, or the whole selection if that card is selected. */
+function copy(canvas: CanvasAdapter, points: Pt[], clipboard: Clipboard): Outcome {
+	const card = canvas.cardAt(boxCenter(points));
+	if (!card) return { label: "nothing to copy" };
+	const cards = canvas.isSelected(card) ? canvas.selectedCards() : [card];
+	clipboard.data = canvas.copy(cards);
+	return { label: cards.length === 1 ? "copy card" : `copy ${plural(cards.length, "card")}` };
+}
+
+/** Paste the clipboard centered on the V's bottom point, selecting what was pasted. */
+function paste(canvas: CanvasAdapter, points: Pt[], clipboard: Clipboard): Outcome {
+	if (!clipboard.data) return { label: "nothing to paste" };
+	// Canvas y grows downward, so the V's vertex is its largest y.
+	const vertex = points.reduce((low, p) => (p.y > low.y ? p : low));
+	const count = canvas.paste(clipboard.data, vertex);
+	return { label: count === 1 ? "paste card" : `paste ${plural(count, "card")}` };
 }
 
 function tap(canvas: CanvasAdapter, p: Pt): Outcome {
@@ -67,8 +91,7 @@ function loop(canvas: CanvasAdapter, glyph: "lasso" | "square", poly: Pt[]): Out
 
 /** Delete the card under the X's center, or the whole selection if that card is selected. */
 function cross(canvas: CanvasAdapter, points: Pt[]): Outcome {
-	const box = toRect(points);
-	const card = canvas.cardAt({ x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 });
+	const card = canvas.cardAt(boxCenter(points));
 	if (!card) return { label: "no card under the x" };
 	if (canvas.isSelected(card)) return { label: `delete ${plural(canvas.deleteSelection(), "card")}` };
 	canvas.deleteCards([card]);
@@ -123,6 +146,11 @@ export function nearestSide(card: CanvasNode, p: Pt): Side {
 		["right", Math.abs(card.x + card.width - p.x)],
 	];
 	return distances.reduce((best, d) => (d[1] < best[1] ? d : best))[0];
+}
+
+function boxCenter(points: Pt[]): Pt {
+	const box = toRect(points);
+	return { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 };
 }
 
 function toRect(points: Pt[]): Rect {

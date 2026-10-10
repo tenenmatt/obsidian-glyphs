@@ -2,7 +2,7 @@
 
 Apple Pencil glyph commands for Obsidian Canvas on iPad. See [SPEC.md](SPEC.md).
 
-**Status: milestone 5 (feedback).** On iPad, pen glyphs act on Canvas (lasso select, X delete, square new card, line connect, pen tap select) and a centered label names each action. "Pen Glyphs: Show cheatsheet" lists every glyph. Settings: glyph mode, show unrecognized strokes, debug panel. Copy/paste (caret, v) come later.
+**Status: milestone 6 (copy/paste).** On iPad, pen glyphs act on Canvas: lasso selects, X deletes, square creates a card, a line connects two cards, a pen tap selects, caret copies and V pastes. A centered label names each action; "Pen Glyphs: Show cheatsheet" lists every glyph. Settings: glyph mode, show unrecognized strokes, debug panel.
 
 ## Dev setup
 
@@ -18,6 +18,14 @@ node scripts/build-templates.ts            # regenerate src/recognize/templates.
 ```
 
 With Obsidian Sync, desktop Obsidian must have the test vault open to upload changes, and both devices need **Settings → Sync → Installed community plugins** and **Active community plugin list** turned on. On the iPad, reload the plugin by toggling it under Community plugins or by running "Reload app without saving".
+
+## Test protocol (milestone 6)
+
+1. **Caret** on an unselected card: flashes "copy card". **V** somewhere else: a copy appears centered on the V's bottom point, selected; flashes "paste card".
+2. Select two connected cards (lasso), **caret** one of them: "copy 2 cards". **V** twice in different places: two copies, each with its own connection between its cards.
+3. **Caret** on empty canvas: "nothing to copy". After restarting Obsidian, **V** first: "nothing to paste".
+4. Copy on one canvas, open another canvas, **V**: pastes there.
+5. **Undo** after a paste removes the pasted cards.
 
 ## Test protocol (milestone 5)
 

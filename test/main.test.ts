@@ -255,7 +255,7 @@ describe("glyphs on a canvas", () => {
 		const { view } = await canvasPlugin({ nodes: new Map() });
 		pointer(view.wrapper, "pointerdown", { t: 0 });
 		pointer(view.wrapper, "pointerup", { t: 50 });
-		const missing = "missing: posFromClient, hitTestNode, getIntersectingNodes, selectOnly, selectAll, deselectAll, removeNode, deleteSelection, requestSave, createTextNode, importData, selection";
+		const missing = "missing: posFromClient, hitTestNode, getIntersectingNodes, selectOnly, selectAll, deselectAll, removeNode, deleteSelection, requestSave, createTextNode, importData, getSelectionData, cloneData, selection";
 		expect(Notice.shown).toEqual([`Pen Glyphs: canvas internals unavailable (${missing})`]);
 		expect(panelText()).toContain(`canvas unavailable (${missing})`);
 	});

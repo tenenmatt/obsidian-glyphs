@@ -26,8 +26,8 @@ export function cheatsheetEntries(templates: Template[]): CheatsheetEntry[] {
 		{ glyph: "square", drawing: square(), over: "empty space", does: "new card, open for editing" },
 		{ glyph: "line", drawing: [{ x: 0, y: 1 }, { x: 1, y: 0 }], over: "from one card to another", does: "connect, with an arrow at the second" },
 		{ glyph: "tap", drawing: "dot", over: "a card / empty canvas", does: "select card / clear selection" },
-		{ glyph: "caret", drawing: fromTemplate("caret"), over: "a card or selection", does: "copy (coming soon)" },
-		{ glyph: "v", drawing: fromTemplate("v"), over: "empty space", does: "paste (coming soon)" },
+		{ glyph: "caret", drawing: fromTemplate("caret"), over: "a card or selection", does: "copy card (if it's selected: the whole selection)" },
+		{ glyph: "v", drawing: fromTemplate("v"), over: "where to paste", does: "paste, centered on the v's point" },
 	];
 }
 

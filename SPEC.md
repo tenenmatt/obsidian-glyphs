@@ -78,8 +78,8 @@ Misses gray out the ink; hits clear it almost immediately. The debug panel logs 
 |---|---|---|
 | X | a node | If the X hits a selected card, delete the whole selection; otherwise delete the card(s) under the X. No need to select first. |
 | Lasso (closed loop) | any area | Select nodes whose centers are inside the loop; a lasso around nothing clears the selection |
-| Caret ^ | a node or selection | Copy (Allume's model) |
-| V | empty space | Paste at the V's point (Allume's model) |
+| Caret ^ | a node or selection | Copy (Allume's model): the card under the caret's center, or the whole selection if that card is selected, with the connections among copied cards. Plugin clipboard. |
+| V | where to paste | Paste (Allume's model), centered on the V's bottom point, with fresh ids; the pasted cards become selected. Can paste repeatedly. |
 | Square (closed, cornered) | empty space | Create a text card filling the square's bounds and open it for editing |
 | Pen tap | a node / empty canvas | Select the node / clear the selection |
 | Line from one card to another | two nodes | Connect them with an edge with an arrow at the card where the stroke ends; any direction, slight curves fine. The edge attaches to the side the stroke last left the first card through and the side it first entered the second card by. |
@@ -102,6 +102,7 @@ Confirmed on Obsidian 1.14.4 (desktop) with the "Inspect canvas internals" and "
 - Delete: `removeNode(node)` (also removes its edges), `deleteSelection()`.
 - Create: `createTextNode({pos, size, text, focus, save})`. `pos` is the top-left corner. `focus` (default true) selects the card and calls `startEditing()`.
 - Connect: no create-edge method. `importData({nodes: [], edges: [edge]})` adds an edge; without its second (`clear`) argument it never removes anything. `fromSide`/`toSide` (`top`/`right`/`bottom`/`left`) set where the edge attaches; omitted ones are chosen by Canvas from the cards' relative positions.
+- Copy/paste: `getSelectionData(set)` returns `{nodes, edges, center}` (only edges among the given cards; `center` is the group's bounding-box center). `cloneData(data, offset)` gives cards and edges fresh ids, re-points edges, offsets cards, and mutates and returns its argument, so clone a copy. `importData` then adds the result.
 - Undo: `requestSave()` records a history entry (debounced), so Canvas's own undo/redo reverts glyph commands. `createTextNode` saves unless `save: false`.
 
 ## Editor (v2)
@@ -151,7 +152,7 @@ Implemented so far (settings tab, `display()`-based; Obsidian 1.13's declarative
 3. ✅ Recognizer (x, lasso, caret, v, square, line); debug panel showing results.
 4. ✅ `CanvasAdapter` and canvas commands: lasso select, X delete (with undo), square new card, line connect, pen tap select. Starts with a dev command that dumps the Canvas internals available in the running Obsidian version.
 5. ✅ Flash notices, cheatsheet, settings tab (glyph mode, show unrecognized strokes, debug panel).
-6. Copy/paste glyphs, settings, glyph-mode toggle.
+6. Copy/paste glyphs (caret, v) with the plugin clipboard; settings and glyph-mode polish.
 7. v2: editor glyphs, custom templates, finger-as-modifier.
 
 ## Decisions

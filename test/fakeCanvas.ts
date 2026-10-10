@@ -1,9 +1,10 @@
 // A stand-in for Obsidian's Canvas internals, behaving the way the probe
 // measured on Obsidian 1.14.4: cards are placed by their top-left corner,
-// focus opens the editor, importData without `clear` only adds, and
-// requestSave records history.
+// focus opens the editor, importData without `clear` only adds, requestSave
+// records history, getSelectionData returns the cards, the edges among them
+// and their center, and cloneData re-ids and offsets its argument in place.
 
-import { CanvasInternals, CanvasNode, Point, Rect } from "../src/targets/CanvasAdapter";
+import { CanvasInternals, CanvasNode, Point, Rect, SelectionData } from "../src/targets/CanvasAdapter";
 
 export interface FakeCard extends CanvasNode {
 	text: string;
@@ -100,7 +101,41 @@ export class FakeCanvas implements CanvasInternals {
 
 	importData(data: { nodes: unknown[]; edges: unknown[] }, clear?: boolean): unknown {
 		if (clear) throw new Error("the adapter must never clear");
+		for (const n of data.nodes as FakeCard[]) {
+			if (!this.nodes.has(n.id)) this.nodes.set(n.id, { ...n, editing: false });
+		}
 		this.edges.push(...(data.edges as FakeEdge[]));
 		return undefined;
+	}
+
+	getSelectionData(items: Set<unknown>): SelectionData {
+		const cards = [...items].filter((i): i is FakeCard => this.nodes.get((i as FakeCard).id) === i);
+		const ids = new Set(cards.map((c) => c.id));
+		const minX = Math.min(...cards.map((c) => c.x));
+		const minY = Math.min(...cards.map((c) => c.y));
+		const maxX = Math.max(...cards.map((c) => c.x + c.width));
+		const maxY = Math.max(...cards.map((c) => c.y + c.height));
+		return {
+			nodes: cards.map((c) => ({ ...c })),
+			edges: this.edges.filter((e) => ids.has(e.fromNode) && ids.has(e.toNode)).map((e) => ({ ...e })),
+			center: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+		};
+	}
+
+	cloneData(data: SelectionData, offset: Point): SelectionData {
+		const remap: Record<string, string> = {};
+		for (const n of data.nodes) {
+			const id = `card${this.nextId++}`;
+			remap[n.id] = id;
+			n.id = id;
+			n.x += offset.x;
+			n.y += offset.y;
+		}
+		for (const e of data.edges) {
+			e.fromNode = remap[e.fromNode] ?? "";
+			e.toNode = remap[e.toNode] ?? "";
+			e.id = `edge${this.nextId++}`;
+		}
+		return data;
 	}
 }

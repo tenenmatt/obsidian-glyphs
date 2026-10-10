@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { nearestSide, runCanvasGlyph, sideCrossed } from "../src/commands/canvasCommands";
+import { Clipboard, nearestSide, runCanvasGlyph, sideCrossed } from "../src/commands/canvasCommands";
 import { CanvasAdapter, CanvasNode } from "../src/targets/CanvasAdapter";
 import { FakeCanvas } from "./fakeCanvas";
 
 let canvas: FakeCanvas;
 let adapter: CanvasAdapter;
+let clipboard: Clipboard;
 
 beforeEach(() => {
+	clipboard = { data: null };
 	canvas = new FakeCanvas();
 	// Client and canvas coordinates differ, so tests catch a missed conversion.
 	canvas.offset = { x: 1000, y: 1000 };
@@ -14,7 +16,8 @@ beforeEach(() => {
 });
 
 /** The flash label of a command's outcome. */
-const label = (...args: Parameters<typeof runCanvasGlyph>) => runCanvasGlyph(...args).label;
+const label = (a: CanvasAdapter, g: Parameters<typeof runCanvasGlyph>[1], pts: { x: number; y: number }[]) =>
+	runCanvasGlyph(a, g, pts, clipboard).label;
 /** The sides the first connection is attached to. */
 const sides = () => ({ fromSide: canvas.edges[0].fromSide, toSide: canvas.edges[0].toSide });
 /** Client-coordinate points for canvas-coordinate input. */
@@ -119,7 +122,7 @@ describe("line", () => {
 	it("connects the card where it starts to the card where it ends", () => {
 		const a = canvas.addCard(0, 0);
 		const b = canvas.addCard(300, 200);
-		expect(runCanvasGlyph(adapter, "line", client([50, 30], [200, 120], [350, 230]))).toEqual({
+		expect(runCanvasGlyph(adapter, "line", client([50, 30], [200, 120], [350, 230]), clipboard)).toEqual({
 			label: "connect",
 			detail: "right → left",
 		});
@@ -210,9 +213,62 @@ describe("line", () => {
 	});
 });
 
-describe("caret and v", () => {
-	it("say copy and paste are not available yet", () => {
-		expect(label(adapter, "caret", client([0, 0]))).toBe("copy (coming soon)");
-		expect(label(adapter, "v", client([0, 0]))).toBe("paste (coming soon)");
+describe("caret (copy) and v (paste)", () => {
+	const caretOver = (cx: number, cy: number) => client([cx - 20, cy + 15], [cx, cy - 15], [cx + 20, cy + 15]);
+	const vAt = (x: number, y: number) => client([x - 20, y - 30], [x, y], [x + 20, y - 30]);
+
+	it("copies the card under the caret", () => {
+		const card = canvas.addCard(0, 0);
+		canvas.addCard(300, 0);
+		expect(label(adapter, "caret", caretOver(50, 30))).toBe("copy card");
+		expect(clipboard.data!.nodes.map((n) => n.id)).toEqual([card.id]);
+	});
+
+	it("copies the whole selection, with its connections, when the caret hits a selected card", () => {
+		const a = canvas.addCard(0, 0);
+		const b = canvas.addCard(200, 0);
+		const other = canvas.addCard(400, 0);
+		canvas.edges.push({ id: "ab", fromNode: a.id, toNode: b.id }, { id: "b-other", fromNode: b.id, toNode: other.id });
+		canvas.selectAll([a, b]);
+		expect(label(adapter, "caret", caretOver(250, 30))).toBe("copy 2 cards");
+		expect(clipboard.data!.edges.map((e) => e.id)).toEqual(["ab"]);
+	});
+
+	it("says there's nothing to copy over empty canvas", () => {
+		expect(label(adapter, "caret", caretOver(500, 500))).toBe("nothing to copy");
+		expect(clipboard.data).toBeNull();
+	});
+
+	it("says there's nothing to paste before anything is copied", () => {
+		expect(label(adapter, "v", vAt(100, 100))).toBe("nothing to paste");
+	});
+
+	it("pastes centered on the v's bottom point, with fresh ids, and selects the result", () => {
+		const card = canvas.addCard(0, 0); // center 50,30
+		label(adapter, "caret", caretOver(50, 30));
+		expect(label(adapter, "v", vAt(500, 400))).toBe("paste card");
+		const pasted = [...canvas.selection] as CanvasNode[];
+		expect(pasted).toHaveLength(1);
+		expect(pasted[0].id).not.toBe(card.id);
+		expect(pasted[0]).toMatchObject({ x: 450, y: 370, width: 100, height: 60 });
+		expect(canvas.saves).toBe(1);
+	});
+
+	it("pastes several cards with their connection re-pointed at the copies, and can paste again", () => {
+		const a = canvas.addCard(0, 0);
+		const b = canvas.addCard(200, 0);
+		canvas.edges.push({ id: "ab", fromNode: a.id, toNode: b.id });
+		canvas.selectAll([a, b]);
+		label(adapter, "caret", caretOver(50, 30));
+		expect(label(adapter, "v", vAt(1000, 1000))).toBe("paste 2 cards");
+		expect(label(adapter, "v", vAt(2000, 2000))).toBe("paste 2 cards");
+		expect(canvas.nodes.size).toBe(6);
+		const copies = canvas.edges.filter((e) => e.id !== "ab");
+		expect(copies).toHaveLength(2);
+		for (const e of copies) {
+			expect([e.fromNode, e.toNode].every((id) => canvas.nodes.has(id) && id !== a.id && id !== b.id)).toBe(true);
+		}
+		// The clipboard still holds the originals, untouched by pasting.
+		expect(clipboard.data!.nodes.map((n) => n.id)).toEqual([a.id, b.id]);
 	});
 });

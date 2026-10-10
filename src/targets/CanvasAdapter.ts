@@ -29,6 +29,14 @@ export interface CanvasNode {
 	height: number;
 }
 
+/** Cards (and the connections among them) as Canvas serializes them for copy/paste. */
+export interface SelectionData {
+	nodes: { id: string; x: number; y: number }[];
+	edges: { id: string; fromNode: string; toNode: string }[];
+	/** Center of the copied cards' bounding box. */
+	center: Point;
+}
+
 export interface CanvasInternals {
 	nodes: Map<string, CanvasNode>;
 	selection: Set<unknown>;
@@ -49,6 +57,8 @@ export interface CanvasInternals {
 		save?: boolean;
 	}): CanvasNode;
 	importData(data: { nodes: unknown[]; edges: unknown[] }, clear?: boolean): unknown;
+	getSelectionData(items: Set<unknown>): SelectionData;
+	cloneData(data: SelectionData, offset: Point): SelectionData;
 }
 
 const REQUIRED_METHODS = [
@@ -63,6 +73,8 @@ const REQUIRED_METHODS = [
 	"requestSave",
 	"createTextNode",
 	"importData",
+	"getSelectionData",
+	"cloneData",
 ] as const;
 
 // Smallest card a square creates, in canvas units.
@@ -113,9 +125,14 @@ export class CanvasAdapter {
 		this.canvas.requestSave();
 	}
 
+	/** The selected cards (the selection can also hold connections). */
+	selectedCards(): CanvasNode[] {
+		return [...this.canvas.selection].filter((item): item is CanvasNode => this.isCard(item));
+	}
+
 	/** Delete everything selected; returns how many cards that was. Undoable. */
 	deleteSelection(): number {
-		const cards = [...this.canvas.selection].filter((item) => this.isCard(item)).length;
+		const cards = this.selectedCards().length;
 		this.canvas.deleteSelection();
 		return cards;
 	}
@@ -144,6 +161,26 @@ export class CanvasAdapter {
 		// Without the `clear` flag, importData only adds: it never removes cards or edges.
 		this.canvas.importData({ nodes: [], edges: [edge] });
 		this.canvas.requestSave();
+	}
+
+	/** The cards' data and the connections among them, detached from the canvas. */
+	copy(cards: CanvasNode[]): SelectionData {
+		return structuredClone(this.canvas.getSelectionData(new Set(cards)));
+	}
+
+	/**
+	 * Paste copied data centered on `at`, with fresh ids, and select it. The
+	 * copy itself is left untouched so it can be pasted again. Undoable.
+	 * Returns the number of cards pasted.
+	 */
+	paste(data: SelectionData, at: Point): number {
+		// cloneData edits its argument in place: give it a fresh copy.
+		const pasted = this.canvas.cloneData(structuredClone(data), { x: at.x - data.center.x, y: at.y - data.center.y });
+		this.canvas.importData({ nodes: pasted.nodes, edges: pasted.edges });
+		const cards = pasted.nodes.map((n) => this.canvas.nodes.get(n.id)).filter((c): c is CanvasNode => c !== undefined);
+		this.select(cards);
+		this.canvas.requestSave();
+		return cards.length;
 	}
 
 	private isCard(item: unknown): boolean {

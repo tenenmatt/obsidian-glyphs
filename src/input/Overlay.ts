@@ -9,9 +9,11 @@ import { PenPoint, PenStroke } from "./strokes";
 export const HOLD_MS = 400;
 export const FADE_MS = 250;
 export const TAP_FADE_MS = 200;
-// Ink width in CSS px at pressure 0 and 1.
-export const MIN_WIDTH = 1.5;
-export const MAX_WIDTH = 6;
+// Ink width in CSS px at zero pressure and at FULL_PRESSURE or more. Normal
+// writing on the Pencil peaks around 0.1-0.3, so full width comes early.
+export const MIN_WIDTH = 2;
+export const MAX_WIDTH = 7;
+export const FULL_PRESSURE = 0.35;
 export const HOVER_RADIUS = 4;
 
 interface Ink {
@@ -146,7 +148,8 @@ function drawInk(ctx: CanvasRenderingContext2D, ink: Ink, alpha: number): void {
 	for (let i = 1; i < pts.length; i++) {
 		const a = pts[i - 1];
 		const b = pts[i];
-		ctx.lineWidth = MIN_WIDTH + (MAX_WIDTH - MIN_WIDTH) * ((a.p + b.p) / 2);
+		const weight = Math.min(1, (a.p + b.p) / 2 / FULL_PRESSURE);
+		ctx.lineWidth = MIN_WIDTH + (MAX_WIDTH - MIN_WIDTH) * weight;
 		ctx.beginPath();
 		ctx.moveTo(a.x, a.y);
 		ctx.lineTo(b.x, b.y);

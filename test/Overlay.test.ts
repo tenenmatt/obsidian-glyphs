@@ -1,5 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FADE_MS, HOLD_MS, HOVER_RADIUS, MAX_WIDTH, MIN_WIDTH, Overlay, TAP_FADE_MS } from "../src/input/Overlay";
+import {
+	FADE_MS,
+	FULL_PRESSURE,
+	HOLD_MS,
+	HOVER_RADIUS,
+	MAX_WIDTH,
+	MIN_WIDTH,
+	Overlay,
+	TAP_FADE_MS,
+} from "../src/input/Overlay";
 import { clock, fakeContext, manualFrames, pt, stroke } from "./helpers";
 
 let draw: ReturnType<typeof fakeContext>;
@@ -62,14 +71,20 @@ describe("ink", () => {
 	});
 
 	it("draws one segment per pair of points, with width following pressure", () => {
+		const half = FULL_PRESSURE / 2;
 		overlay.begin(pt(0, 0, 0, 0));
-		overlay.extend([pt(10, 0, 5, 0), pt(20, 0, 10, 1)]);
+		overlay.extend([pt(10, 0, 5, 0), pt(20, 0, 10, half * 2), pt(30, 0, 15, 1)]);
 		frames.flush();
 		const strokes = draw.ops("stroke");
-		expect(strokes.map((s) => s.lineWidth)).toEqual([MIN_WIDTH, MIN_WIDTH + (MAX_WIDTH - MIN_WIDTH) / 2]);
+		expect(strokes.map((s) => s.lineWidth)).toEqual([
+			MIN_WIDTH,
+			MIN_WIDTH + (MAX_WIDTH - MIN_WIDTH) / 2,
+			MAX_WIDTH, // capped once pressure passes FULL_PRESSURE
+		]);
 		expect(draw.ops("lineTo").map((c) => c.args)).toEqual([
 			[10, 0],
 			[20, 0],
+			[30, 0],
 		]);
 	});
 

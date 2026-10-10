@@ -60,7 +60,7 @@ src/
 ## Recognition
 
 - Use the **$P point-cloud recognizer** (handles multistroke glyphs like a two-stroke X) or **$1 Unistroke** if keeping v1 single-stroke. Reference JS implementations exist from the University of Washington ($1, $N, $P pages under depts.washington.edu/madlab/proj/dollar/). Check their license before vendoring; otherwise reimplement (both are small).
-- Multistroke: group strokes that start within ~300 ms of the previous stroke ending into one gesture.
+- Multistroke (deferred, see Decisions): group strokes that start within ~300 ms of the previous stroke ending into one gesture.
 - Return `{name, score}`. Below a configurable threshold, show a subtle "?" flash and do nothing.
 - Ship built-in templates; v2 lets users record their own templates in settings.
 
@@ -72,8 +72,11 @@ src/
 | Lasso (closed loop) | any area | Select nodes whose centers are inside the loop |
 | Caret ^ | a node or selection | Copy (Allume's model) |
 | V | empty space | Paste at the V's point (Allume's model) |
+| Square (closed, cornered) | empty space | Create a text card filling the square's bounds |
 | Pen tap | a node | Select node |
-| Horizontal line through 2+ nodes | nodes | Connect them with edges, in stroke order (stretch goal) |
+| Line from one card to another | two nodes | Connect them with an edge, from the card where the stroke starts to the card where it ends; any direction, slight curves fine (stretch goal) |
+
+Lasso vs square: both are closed loops. Context decides first: a closed loop that encloses one or more card centers is a lasso (select), whatever its shape; a closed loop over empty space is a square (new card) if it has corners. This keeps a rectangular lasso around cards from creating a card.
 
 Caret and V are mirror images, so the recognizer must stay orientation-sensitive ($P is, as long as we don't add rotation invariance).
 
@@ -134,7 +137,9 @@ Settled 2026-10-09:
 - **Pen gives up pan/drag on Canvas.** Fingers move things; the pen issues commands.
 - **Scribble:** fine to lose inside Obsidian if necessary, but it must keep working elsewhere on the iPad. Prefer solutions scoped to Obsidian (or to glyph mode).
 - **Why Canvas first:** the author mostly writes Markdown but under-uses Canvas because of gesture friction. The v1 test is whether glyphs make Canvas meaningfully more useful.
-- **Recognizer:** $P (multistroke-capable); a single-stroke X is acceptable to the author. Lasso detected geometrically (closed path + area) rather than by template.
+- **Recognizer:** $P; a single-stroke X is acceptable to the author. Lasso detected geometrically (the path closes on itself + encloses area) rather than by template: real lassos overshoot their start, so endpoint distance alone fails.
+- **Single strokes only (for now):** each stroke is recognized the moment the pen lifts, with no wait for a possible second stroke. Revisit if a glyph needs two strokes or single-stroke recognition proves inaccurate.
+- **Ink weight:** the author writes at 0.1-0.3 pressure, so full ink width is reached at 0.35.
 - **Hover:** target device is an M5 iPad Pro with Apple Pencil Pro. Use hover (e.g. previewing the target) when present; degrade cleanly without it.
 - **Pen tap vs edit:** decide empirically: compare pen double-tap-to-edit against finger-tap-to-edit.
 - **Distribution:** personal use first, community plugin later. Before publishing: settle licensing (incl. vendored $P code) and contact the Allume team.

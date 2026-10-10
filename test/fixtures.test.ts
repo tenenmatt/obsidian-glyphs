@@ -71,7 +71,7 @@ describe("SaveFixtureModal", () => {
 		const labels = Array.from(modal.contentEl.querySelectorAll(".pen-glyphs-fixture-labels button")).map(
 			(b) => b.textContent,
 		);
-		expect(labels).toEqual(["x", "lasso", "caret", "v", "line", "other"]);
+		expect(labels).toEqual(["x", "lasso", "caret", "v", "square", "line", "other"]);
 	});
 
 	it("saves under a quick label and closes", async () => {

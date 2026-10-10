@@ -51,3 +51,22 @@
 .pen-glyphs-debug.is-collapsed .pen-glyphs-debug-body {
 	display: none;
 }
+
+.pen-glyphs-overlay {
+	position: fixed;
+	left: 0;
+	top: 0;
+	z-index: 999;
+	pointer-events: none;
+}
+
+.pen-glyphs-fixture-labels {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.pen-glyphs-fixture-labels button {
+	min-width: 64px;
+}

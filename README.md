@@ -2,7 +2,7 @@
 
 Apple Pencil glyph commands for Obsidian Canvas on iPad. See [SPEC.md](SPEC.md).
 
-**Status: milestone 1 (input spike).** The plugin logs pen and finger input on Canvas views and can block pen input in different ways, to test whether we can claim the pen without breaking finger gestures.
+**Status: milestone 2 (stroke overlay).** On iPad, the pen is claimed on Canvas: it draws ink that fades out, shows a hover dot, and does nothing else yet. Fingers behave normally. Elsewhere the plugin stays inactive.
 
 ## Dev setup
 
@@ -15,22 +15,16 @@ npm run build                              # typecheck + one production build
 
 With Obsidian Sync, desktop Obsidian must have the test vault open to upload changes, and both devices need **Settings → Sync → Installed community plugins** and **Active community plugin list** turned on. On the iPad, reload the plugin by toggling it under Community plugins or by running "Reload app without saving".
 
-## Spike test protocol
+## Test protocol (milestone 2)
 
-Make a test canvas with 2–3 cards. For each blocking mode (tap the `mode:` button on the debug panel, the ribbon pen icon, or run "Cycle pen blocking mode"), do the following, then press **save**. Logs land in `pen-glyphs-logs/` in the vault and sync back to the Mac.
+On a canvas with a few cards, with glyph mode on (ribbon pen icon, the `glyphs:` button on the debug panel, or "Toggle glyph mode"):
 
-1. Pen drag on empty canvas (did it pan?)
-2. Pen drag starting on a card (did the card move?)
-3. Pen tap on a card (did it select?)
-4. Hover the pen over the canvas without touching
-5. Two-finger pan, pinch zoom, one-finger drag of a card (should always work)
-6. Double-tap a card with a finger to edit it, then write in it with the pen (Scribble should still work)
+1. Draw strokes on empty canvas and over cards. Ink should appear under the pen tip with no noticeable lag, get thicker as you press harder, and fade about half a second after you lift.
+2. Tap with the pen. The panel should log `tap`, and a dot should flash.
+3. Hover the pen near the screen. A faint dot should follow it and disappear when you move the pen away.
+4. Fingers: pan, pinch, drag a card, double-tap to edit, Scribble inside a card. All should work as before.
+5. The canvas zoom buttons and card toolbar should still respond to the pen (the panel logs `passed through`).
+6. Draw an X, then press **save stroke** and pick `x`. Do the same for a lasso and a few others. Fixtures land in `pen-glyphs-fixtures/`.
+7. Toggle glyph mode off: the pen should behave as it does without the plugin.
 
-Run `off` first: it's the baseline that shows which event family Canvas consumes. Each stroke summary reports what reached Canvas and what changed on the canvas (pan, zoom, selection, node moves).
-
-| Mode | Blocks |
-|---|---|
-| `off` | nothing (observe only) |
-| `pointer` | pen pointer events |
-| `touch` | stylus touch events |
-| `all` | both, plus compatibility mouse/click events during and just after a pen stroke |
+The milestone 1 input spike (blocking-mode experiments) lives in git history at `6d2f391`; its findings are in SPEC.md.

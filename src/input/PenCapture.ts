@@ -1,74 +1,82 @@
-// Milestone 1 input spike: observe pen vs finger input on Canvas views, and
-// optionally block pen input before Canvas sees it.
+// Claims Apple Pencil input on Canvas views and turns it into strokes.
+//
+// iPadOS WebKit reports one pen contact three ways: pointer events, touch
+// events (touchType "stylus"), and compatibility mouse events. The input spike
+// (see SPEC.md "Spike findings") showed Canvas reacts to the pen mostly via the
+// compatibility mouse events, and that blocking both the pen's pointer and touch
+// events is what stops them. Fingers are never touched.
 //
 // All listeners sit on `window` in the capture phase, so they run before any
-// handler Canvas attaches to its own elements. Matching bubble-phase listeners
-// on `window` tell us, in "off" mode, whether Canvas consumed an event
-// (stopped propagation or called preventDefault).
-//
-// iPadOS WebKit fires pointer events AND touch events (and then compatibility
-// mouse events) for the same contact, so blocking one family may not be enough.
-// The block modes let us test each family on the device.
+// handler Canvas attaches to its own elements.
 
-import { App, Plugin } from "obsidian";
+import { Plugin } from "obsidian";
 
-export type BlockMode = "off" | "pointer" | "touch" | "all";
-export const BLOCK_MODES: BlockMode[] = ["off", "pointer", "touch", "all"];
-
-// After a pen stroke ends, compatibility mouse events and click can still
-// arrive; in "all" mode we swallow those for this long.
-const MOUSE_SUPPRESS_MS = 500;
-// Wait this long after pointerup for trailing touch/mouse events before
-// writing the stroke summary.
-const SUMMARY_DELAY_MS = 400;
-// A gap longer than this between pen hover events starts a new hover session.
-const HOVER_GAP_MS = 300;
-
-interface CanvasSnapshot {
-	x: number;
+export interface PenPoint {
+	x: number; // client px
 	y: number;
-	zoom: number;
-	selected: number;
-	nodePosHash: number;
+	t: number; // ms, event timeStamp
+	p: number; // pressure 0..1
 }
 
-interface StrokeRecord {
-	id: number;
-	pointerId: number;
-	start: number;
-	end: number | null;
-	moves: number;
-	coalesced: number;
-	pointerBlocked: boolean;
-	downBubble: "not reached" | "reached" | "reached, prevented";
-	touchStart: "none" | "not reached" | "reached" | "reached, prevented" | "blocked";
-	compat: string[];
-	before: CanvasSnapshot | null;
-	canvasEl: Element;
+export interface PenStroke {
+	kind: "tap" | "stroke";
+	points: PenPoint[];
+	target: Element;
 }
+
+export interface PenCaptureHandlers {
+	strokeStart(point: PenPoint): void;
+	strokeMove(points: PenPoint[]): void;
+	strokeEnd(stroke: PenStroke): void;
+	strokeCancel(): void;
+	hover(x: number, y: number): void;
+	hoverEnd(): void;
+	log(line: string): void;
+}
+
+// A pen contact shorter than this, that never strays farther than TAP_MAX_DIST
+// from where it started, is a tap rather than a stroke.
+const TAP_MAX_MS = 200;
+const TAP_MAX_DIST = 8;
+// Belt and braces: swallow any compatibility mouse events that still arrive
+// this soon after a pen stroke, unless a finger has touched down since.
+const MOUSE_SUPPRESS_MS = 300;
+// Hover normally ends with a pointerout as the pen leaves range; this timeout
+// is the fallback if that never arrives.
+const HOVER_TIMEOUT_MS = 1500;
+
+// Where the pen is claimed: the Canvas surface inside a Canvas view.
+const CANVAS_SURFACE = '.workspace-leaf-content[data-type="canvas"] .canvas-wrapper';
+// Inside the surface, the pen keeps its normal behavior on Canvas's own
+// controls and on anything being edited (Scribble handles those natively).
+const PASS_THROUGH = [
+	".canvas-controls",
+	".canvas-card-menu",
+	".canvas-menu",
+	"button",
+	".clickable-icon",
+	".canvas-node.is-editing",
+	'[contenteditable="true"]',
+	"input",
+	"textarea",
+].join(", ");
 
 export class PenCapture {
-	private stroke: StrokeRecord | null = null;
-	private strokeCount = 0;
+	private active: { pointerId: number; points: PenPoint[]; target: Element } | null = null;
 	private stylusTouchIds = new Set<number>();
-	private blockingStylusTouches = false;
 	private suppressMouseUntil = 0;
-	private lastHover = 0;
-	private hoverCount = 0;
+	private hovering = false;
+	private hoverTimer: number | null = null;
 
-	constructor(
-		private app: App,
-		private log: (line: string) => void,
-		private mode: () => BlockMode,
-	) {}
+	constructor(private h: PenCaptureHandlers, private enabled: () => boolean) {}
 
 	register(plugin: Plugin): void {
 		const cap = { capture: true, passive: false };
-		const bub = { capture: false, passive: true };
 		plugin.registerDomEvent(window, "pointerdown", this.onPointerDown, cap);
 		plugin.registerDomEvent(window, "pointermove", this.onPointerMove, cap);
 		plugin.registerDomEvent(window, "pointerup", this.onPointerEnd, cap);
 		plugin.registerDomEvent(window, "pointercancel", this.onPointerEnd, cap);
+		plugin.registerDomEvent(window, "pointerout", this.onPointerOut, cap);
 		plugin.registerDomEvent(window, "touchstart", this.onTouchStart, cap);
 		plugin.registerDomEvent(window, "touchmove", this.onTouchOther, cap);
 		plugin.registerDomEvent(window, "touchend", this.onTouchOther, cap);
@@ -76,239 +84,136 @@ export class PenCapture {
 		for (const type of ["mousedown", "mouseup", "click", "dblclick", "contextmenu"] as const) {
 			plugin.registerDomEvent(window, type, this.onMouse, cap);
 		}
-
-		plugin.registerDomEvent(window, "pointerdown", this.onPointerDownBubble, bub);
-		plugin.registerDomEvent(window, "touchstart", this.onTouchStartBubble, bub);
+		plugin.register(() => this.clearHoverTimer());
 	}
 
 	// ---- pointer events -------------------------------------------------
 
 	private onPointerDown = (e: PointerEvent): void => {
-		const canvasEl = this.canvasViewEl(e.target);
-		if (!canvasEl) return;
+		if (e.pointerType !== "pen") return;
+		this.endHover();
+		const target = this.claim(e.target, true);
+		if (!target) return;
 
-		if (e.pointerType !== "pen") {
-			this.log(`ptr down ${e.pointerType} #${e.pointerId} (passes through)`);
-			return;
+		block(e);
+		try {
+			target.setPointerCapture(e.pointerId);
+		} catch {
+			// Not fatal: we still see the events at the window.
 		}
-
-		if (this.isEditingTarget(e.target)) {
-			this.log(`ptr down pen in editing node: ignored, Scribble/typing should work`);
-			return;
-		}
-
-		if (this.hoverCount > 0) {
-			this.log(`hover: ${this.hoverCount} events before this stroke`);
-			this.hoverCount = 0;
-		}
-
-		const mode = this.mode();
-		const pointerBlocked = mode === "pointer" || mode === "all";
-		const coalescedSupported = typeof e.getCoalescedEvents === "function";
-		this.stroke = {
-			id: ++this.strokeCount,
-			pointerId: e.pointerId,
-			start: e.timeStamp,
-			end: null,
-			moves: 0,
-			coalesced: 0,
-			pointerBlocked,
-			downBubble: "not reached",
-			touchStart: "none",
-			compat: [],
-			before: this.snapshot(canvasEl),
-			canvasEl,
-		};
-
-		this.log(
-			`stroke ${this.stroke.id} ptr down pen #${e.pointerId} mode=${mode}` +
-				` p=${e.pressure.toFixed(2)} tilt=${e.tiltX},${e.tiltY}` +
-				` alt=${fmt(num(e, "altitudeAngle"))} az=${fmt(num(e, "azimuthAngle"))}` +
-				` coalesced=${coalescedSupported ? "yes" : "no"}` +
-				` target=${describe(e.target)}`,
-		);
-
-		if (pointerBlocked) {
-			block(e);
-			try {
-				(e.target as Element).setPointerCapture(e.pointerId);
-			} catch (err) {
-				this.log(`setPointerCapture failed: ${String(err)}`);
-			}
-		}
+		const point = toPoint(e);
+		this.active = { pointerId: e.pointerId, points: [point], target };
+		this.h.strokeStart(point);
 	};
 
 	private onPointerMove = (e: PointerEvent): void => {
 		if (e.pointerType !== "pen") return;
-		const s = this.stroke;
-		if (s && s.end === null && e.pointerId === s.pointerId) {
-			s.moves++;
-			s.coalesced += e.getCoalescedEvents?.().length ?? 1;
-			if (s.pointerBlocked) block(e);
+		const a = this.active;
+		if (a && e.pointerId === a.pointerId) {
+			block(e);
+			const coalesced = e.getCoalescedEvents?.() ?? [];
+			const points = coalesced.length > 0 ? coalesced.map(toPoint) : [toPoint(e)];
+			a.points.push(...points);
+			this.h.strokeMove(points);
 			return;
 		}
-		// Pen moving with no stroke in progress = hover (Pencil Pro / Pencil 2 on M2+ iPads).
-		if (e.buttons === 0 && this.canvasViewEl(e.target)) {
-			if (e.timeStamp - this.lastHover > HOVER_GAP_MS) {
-				this.log(
-					`hover start (${Math.round(e.clientX)},${Math.round(e.clientY)})` +
-						` alt=${fmt(num(e, "altitudeAngle"))} az=${fmt(num(e, "azimuthAngle"))}`,
-				);
-			}
-			this.lastHover = e.timeStamp;
-			this.hoverCount++;
-		}
+		// Pen moving without contact = hover (Pencil Pro / Pencil 2 on M2+ iPads).
+		if (e.buttons === 0 && this.claim(e.target, false)) this.hover(e.clientX, e.clientY);
 	};
 
 	private onPointerEnd = (e: PointerEvent): void => {
-		const s = this.stroke;
-		if (e.pointerType !== "pen" || !s || s.end !== null || e.pointerId !== s.pointerId) {
-			if (e.pointerType === "touch" && this.canvasViewEl(e.target)) {
-				this.log(`ptr ${e.type === "pointerup" ? "up" : "cancel"} touch #${e.pointerId}`);
-			}
+		const a = this.active;
+		if (e.pointerType !== "pen" || !a || e.pointerId !== a.pointerId) return;
+		block(e);
+		this.active = null;
+		this.suppressMouseUntil = performance.now() + MOUSE_SUPPRESS_MS;
+
+		if (e.type === "pointercancel") {
+			this.h.log(`stroke cancelled by the system after ${a.points.length} points`);
+			this.h.strokeCancel();
 			return;
 		}
-		s.end = e.timeStamp;
-		if (e.type === "pointercancel") s.compat.push("pointercancel!");
-		if (s.pointerBlocked) block(e);
-		if (this.mode() === "all") this.suppressMouseUntil = performance.now() + MOUSE_SUPPRESS_MS;
-		window.setTimeout(() => this.summarize(s), SUMMARY_DELAY_MS);
+		const last = toPoint(e);
+		const prev = a.points[a.points.length - 1];
+		if (last.x !== prev.x || last.y !== prev.y) a.points.push(last);
+		this.h.strokeEnd({ kind: classify(a.points), points: a.points, target: a.target });
 	};
 
-	private onPointerDownBubble = (e: PointerEvent): void => {
-		const s = this.stroke;
-		if (e.pointerType === "pen" && s && e.pointerId === s.pointerId && s.end === null) {
-			s.downBubble = e.defaultPrevented ? "reached, prevented" : "reached";
-		}
+	private onPointerOut = (e: PointerEvent): void => {
+		// relatedTarget null = the pointer left the page entirely (out of hover range).
+		if (e.pointerType === "pen" && e.relatedTarget === null && this.hovering) this.endHover();
 	};
 
-	// ---- touch events ----------------------------------------------------
+	// ---- touch and compatibility mouse events ----------------------------
 
 	private onTouchStart = (e: TouchEvent): void => {
-		if (!this.canvasViewEl(e.target)) return;
 		const stylus = Array.from(e.changedTouches).filter(isStylus);
-		const fingers = e.changedTouches.length - stylus.length;
-
 		if (stylus.length === 0) {
-			this.log(`touchstart direct x${fingers} (total touches ${e.touches.length})`);
+			// A finger: never block it, and stop swallowing mouse events so its click lands.
+			this.suppressMouseUntil = 0;
 			return;
 		}
+		if (!this.claim(e.target, false)) return;
 		for (const t of stylus) this.stylusTouchIds.add(t.identifier);
-
-		const s = this.stroke;
-		const t = stylus[0];
-		this.log(
-			`touchstart stylus force=${fmt(t.force)} alt=${fmt(num(t, "altitudeAngle"))}` +
-				` az=${fmt(num(t, "azimuthAngle"))}` +
-				(fingers > 0 ? ` + ${fingers} finger(s) in same event!` : "") +
-				(s ? ` (${Math.round(e.timeStamp - s.start)}ms after ptr down)` : " (no pointer stroke!)"),
-		);
-
-		const mode = this.mode();
-		this.blockingStylusTouches =
-			(mode === "touch" || mode === "all") && !this.isEditingTarget(e.target);
-		if (s) s.touchStart = this.blockingStylusTouches ? "blocked" : "not reached";
-		if (this.blockingStylusTouches) block(e);
+		block(e);
 	};
 
 	private onTouchOther = (e: TouchEvent): void => {
-		const stylus = Array.from(e.changedTouches).filter((t) => this.stylusTouchIds.has(t.identifier));
-		if (stylus.length === 0) return;
-		if (this.blockingStylusTouches) block(e);
-		if (e.type !== "touchmove") {
-			for (const t of stylus) this.stylusTouchIds.delete(t.identifier);
-			if (this.stylusTouchIds.size === 0) this.blockingStylusTouches = false;
-		}
+		const ours = Array.from(e.changedTouches).filter((t) => this.stylusTouchIds.has(t.identifier));
+		if (ours.length === 0) return;
+		block(e);
+		if (e.type !== "touchmove") for (const t of ours) this.stylusTouchIds.delete(t.identifier);
 	};
-
-	private onTouchStartBubble = (e: TouchEvent): void => {
-		const s = this.stroke;
-		if (s && s.touchStart === "not reached" && Array.from(e.changedTouches).some(isStylus)) {
-			s.touchStart = e.defaultPrevented ? "reached, prevented" : "reached";
-		}
-	};
-
-	// ---- compatibility mouse events --------------------------------------
 
 	private onMouse = (e: MouseEvent): void => {
-		const s = this.stroke;
-		const inPenWindow = s !== null && (s.end === null || e.timeStamp - s.end < SUMMARY_DELAY_MS);
-		if (inPenWindow) s!.compat.push(e.type);
-		if (performance.now() < this.suppressMouseUntil || (this.mode() === "all" && s?.end === null)) {
-			block(e);
-			if (inPenWindow) s!.compat[s!.compat.length - 1] += "(blocked)";
-		}
+		if (this.active || performance.now() < this.suppressMouseUntil) block(e);
 	};
 
-	// ---- summary ---------------------------------------------------------
+	// ---- hover -------------------------------------------------------------
 
-	private summarize(s: StrokeRecord): void {
-		const ms = Math.round((s.end ?? s.start) - s.start);
-		const after = this.snapshot(s.canvasEl);
-		const avgCoalesced = s.moves ? (s.coalesced / s.moves).toFixed(1) : "-";
-		this.log(
-			`stroke ${s.id} summary: ${ms}ms, ${s.moves} moves (coalesced avg ${avgCoalesced})\n` +
-				`    ptrdown→window bubble: ${s.pointerBlocked ? "blocked by us" : s.downBubble}\n` +
-				`    stylus touchstart: ${s.touchStart}\n` +
-				`    mouse compat: ${s.compat.length ? s.compat.join(" ") : "none"}\n` +
-				`    canvas effect: ${diffSnapshots(s.before, after)}`,
-		);
-		if (this.stroke === s) this.stroke = null;
+	private hover(x: number, y: number): void {
+		this.hovering = true;
+		this.h.hover(x, y);
+		this.clearHoverTimer();
+		this.hoverTimer = window.setTimeout(() => this.endHover(), HOVER_TIMEOUT_MS);
 	}
 
-	// ---- helpers ---------------------------------------------------------
-
-	/** The Canvas view content element containing `target`, if any. */
-	private canvasViewEl(target: EventTarget | null): Element | null {
-		if (!(target instanceof Element)) return null;
-		return target.closest('.workspace-leaf-content[data-type="canvas"]');
+	private endHover(): void {
+		this.clearHoverTimer();
+		if (!this.hovering) return;
+		this.hovering = false;
+		this.h.hoverEnd();
 	}
 
-	private isEditingTarget(target: EventTarget | null): boolean {
-		if (!(target instanceof Element)) return false;
-		return target.closest('.canvas-node.is-editing, [contenteditable="true"], input, textarea') !== null;
+	private clearHoverTimer(): void {
+		if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
+		this.hoverTimer = null;
 	}
 
-	/**
-	 * Undocumented Canvas internals, read-only, so a stroke summary can report
-	 * whether the pen panned, zoomed, selected or dragged. Preview of what
-	 * CanvasAdapter will own later.
-	 */
-	private snapshot(canvasEl: Element): CanvasSnapshot | null {
-		try {
-			const leaf = this.app.workspace
-				.getLeavesOfType("canvas")
-				.find((l) => l.view.containerEl.contains(canvasEl));
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const canvas = (leaf?.view as any)?.canvas;
-			if (!canvas) return null;
-			let nodePosHash = 0;
-			for (const node of canvas.nodes?.values?.() ?? []) {
-				nodePosHash += (node.x ?? 0) * 31 + (node.y ?? 0) * 17;
-			}
-			return {
-				x: canvas.tx ?? canvas.x,
-				y: canvas.ty ?? canvas.y,
-				zoom: canvas.tZoom ?? canvas.zoom,
-				selected: canvas.selection?.size ?? 0,
-				nodePosHash,
-			};
-		} catch {
+	// ---- helpers -----------------------------------------------------------
+
+	/** The target element if the pen should be claimed there, else null. */
+	private claim(target: EventTarget | null, logPassThrough: boolean): Element | null {
+		if (!this.enabled() || !(target instanceof Element)) return null;
+		if (!target.closest(CANVAS_SURFACE)) return null;
+		if (target.closest(PASS_THROUGH)) {
+			if (logPassThrough) this.h.log(`pen on ${describe(target)}: passed through`);
 			return null;
 		}
+		return target;
 	}
 }
 
-function diffSnapshots(a: CanvasSnapshot | null, b: CanvasSnapshot | null): string {
-	if (!a || !b) return "unknown (couldn't read canvas internals)";
-	const changes: string[] = [];
-	if (Math.abs(a.x - b.x) > 0.5 || Math.abs(a.y - b.y) > 0.5) {
-		changes.push(`PANNED Δ(${Math.round(b.x - a.x)},${Math.round(b.y - a.y)})`);
-	}
-	if (Math.abs(a.zoom - b.zoom) > 1e-3) changes.push(`ZOOMED ${fmt(a.zoom)}→${fmt(b.zoom)}`);
-	if (a.selected !== b.selected) changes.push(`SELECTION ${a.selected}→${b.selected}`);
-	if (Math.abs(a.nodePosHash - b.nodePosHash) > 0.5) changes.push("NODE MOVED");
-	return changes.length ? changes.join(", ") : "none";
+function classify(points: PenPoint[]): PenStroke["kind"] {
+	const first = points[0];
+	const duration = points[points.length - 1].t - first.t;
+	if (duration > TAP_MAX_MS) return "stroke";
+	const strayed = points.some((p) => Math.hypot(p.x - first.x, p.y - first.y) > TAP_MAX_DIST);
+	return strayed ? "stroke" : "tap";
+}
+
+function toPoint(e: PointerEvent): PenPoint {
+	return { x: e.clientX, y: e.clientY, t: e.timeStamp, p: e.pressure };
 }
 
 function block(e: Event): void {
@@ -320,17 +225,7 @@ function isStylus(t: Touch): boolean {
 	return (t as Touch & { touchType?: string }).touchType === "stylus";
 }
 
-function num(obj: object, key: string): number | undefined {
-	const v = (obj as Record<string, unknown>)[key];
-	return typeof v === "number" ? v : undefined;
-}
-
-function fmt(v: number | undefined): string {
-	return v === undefined ? "n/a" : v.toFixed(2);
-}
-
-function describe(target: EventTarget | null): string {
-	if (!(target instanceof Element)) return String(target);
+export function describe(target: Element): string {
 	const cls = Array.from(target.classList).slice(0, 3).join(".");
 	return target.tagName.toLowerCase() + (cls ? `.${cls}` : "");
 }

@@ -115,8 +115,8 @@ A modal opened by a command palette entry ("Pen Glyphs: Show cheatsheet") and op
 
 ## Milestones
 
-1. **Input spike:** on iPad, log `pointerType` for pen vs finger on a Canvas, and confirm `preventDefault` on pen stops panning while fingers still pan. *This validates the whole approach; stop and reassess if it fails.*
-2. Stroke overlay rendering.
+1. ✅ **Input spike:** on iPad, log `pointerType` for pen vs finger on a Canvas, and confirm `preventDefault` on pen stops panning while fingers still pan. *This validates the whole approach; stop and reassess if it fails.*
+2. Stroke overlay rendering, hover dot, fixture recording.
 3. Recognizer with X and lasso; debug panel showing scores.
 4. `CanvasAdapter`: hit-test, select, delete with undo.
 5. Flash notices and cheatsheet.

@@ -39,7 +39,8 @@ export class DebugPanel {
 		if (this.el) return;
 		this.el = document.body.createDiv({ cls: "pen-glyphs-debug" });
 		const header = this.el.createDiv({ cls: "pen-glyphs-debug-header" });
-		header.createSpan({ text: "pen-glyphs", cls: "pen-glyphs-debug-title" });
+		// The running version, which can lag the installed manifest until the plugin reloads.
+		header.createSpan({ text: `pen-glyphs ${this.plugin.manifest.version}`, cls: "pen-glyphs-debug-title" });
 		this.actionsEl = header.createDiv({ cls: "pen-glyphs-debug-actions" });
 		this.bodyEl = this.el.createEl("pre", { cls: "pen-glyphs-debug-body" });
 		this.refreshActions();

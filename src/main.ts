@@ -26,17 +26,9 @@ export default class PenGlyphsPlugin extends Plugin {
 	override async onload(): Promise<void> {
 		this.settings = loadSettings(await this.loadData());
 
-		// Dev: available everywhere, since desktop Canvas has the same internals.
-		this.addCommand({
-			id: "inspect-canvas-internals",
-			name: "Inspect canvas internals (dev)",
-			callback: () => this.inspectCanvas(),
-		});
-		this.addCommand({
-			id: "probe-canvas-behavior",
-			name: "Probe canvas behavior (dev)",
-			callback: () => this.probeCanvas(),
-		});
+		// Available on desktop too, since desktop Canvas has the same internals.
+		this.devCommand("inspect-canvas-internals", "Inspect canvas internals (dev)", () => this.inspectCanvas());
+		this.devCommand("probe-canvas-behavior", "Probe canvas behavior (dev)", () => this.probeCanvas());
 
 		if (!(Platform.isIosApp && Platform.isTablet)) {
 			console.log("[pen-glyphs] not an iPad; staying inactive");
@@ -74,29 +66,39 @@ export default class PenGlyphsPlugin extends Plugin {
 
 		this.addSettingTab(new PenGlyphsSettingTab(this.app, this));
 		this.addRibbonIcon("pen-tool", "Pen Glyphs: toggle glyph mode", () => this.toggleGlyphMode());
-		this.addCommand({
-			id: "show-cheatsheet",
-			name: "Show cheatsheet",
-			callback: () => new CheatsheetModal(this.app, cheatsheetEntries(TEMPLATES)).open(),
-		});
+		this.addRibbonIcon("help-circle", "Pen Glyphs: show cheatsheet", () => this.openCheatsheet());
+		this.addCommand({ id: "show-cheatsheet", name: "Show cheatsheet", callback: () => this.openCheatsheet() });
 		this.addCommand({
 			id: "toggle-glyph-mode",
 			name: "Toggle glyph mode",
 			callback: () => this.toggleGlyphMode(),
 		});
 		this.addCommand({
-			id: "save-last-gesture-fixture",
-			name: "Save last gesture as fixture",
-			callback: () => this.openSaveFixture(),
-		});
-		this.addCommand({
 			id: "toggle-debug-panel",
-			name: "Toggle debug panel",
-			callback: () => this.updateSetting("showDebugPanel", !this.panel.isShown),
+			name: "Toggle developer tools",
+			callback: () => this.updateSetting("showDebugPanel", !this.settings.showDebugPanel),
 		});
-		this.addCommand({ id: "save-debug-log", name: "Save debug log to vault", callback: () => this.saveLog() });
-		this.addCommand({ id: "copy-debug-log", name: "Copy debug log to clipboard", callback: () => this.panel.copy() });
-		this.addCommand({ id: "clear-debug-log", name: "Clear debug log", callback: () => this.panel.clear() });
+		this.devCommand("save-last-gesture-fixture", "Save last gesture as fixture (dev)", () => this.openSaveFixture());
+		this.devCommand("save-debug-log", "Save debug log to vault (dev)", () => this.saveLog());
+		this.devCommand("copy-debug-log", "Copy debug log to clipboard (dev)", () => this.panel.copy());
+		this.devCommand("clear-debug-log", "Clear debug log (dev)", () => this.panel.clear());
+	}
+
+	/** A command listed only while developer tools are on. */
+	private devCommand(id: string, name: string, run: () => unknown): void {
+		this.addCommand({
+			id,
+			name,
+			checkCallback: (checking) => {
+				if (!this.settings.showDebugPanel) return false;
+				if (!checking) void run();
+				return true;
+			},
+		});
+	}
+
+	openCheatsheet(): void {
+		new CheatsheetModal(this.app, cheatsheetEntries(TEMPLATES)).open();
 	}
 
 	/** Apply and persist a change to one setting. Used by the settings tab, commands and controls. */

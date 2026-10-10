@@ -14,6 +14,7 @@ describe("PenGlyphsSettingTab", () => {
 		const host = Object.assign(new Plugin(new App(), { id: "pen-glyphs", version: "1" }), {
 			settings: { ...DEFAULT_SETTINGS, showMisses: false },
 			updateSetting: vi.fn(async () => {}),
+			openCheatsheet: vi.fn(),
 		});
 		const t = new PenGlyphsSettingTab(new App() as never, host as never);
 		t.display();
@@ -24,8 +25,8 @@ describe("PenGlyphsSettingTab", () => {
 	it("shows a toggle per setting with its current value", () => {
 		const { t } = tab();
 		const names = Array.from(t.containerEl.querySelectorAll(".setting-item-name")).map((n) => n.textContent);
-		expect(names).toEqual(["Glyph mode", "Show unrecognized strokes", "Debug panel"]);
-		expect(toggles(t).map((x) => x.checked)).toEqual([true, false, true]);
+		expect(names).toEqual(["Cheatsheet", "Glyph mode", "Show unrecognized strokes", "Developer tools"]);
+		expect(toggles(t).map((x) => x.checked)).toEqual([true, false, false]);
 	});
 
 	it("routes changes through updateSetting", () => {
@@ -34,6 +35,12 @@ describe("PenGlyphsSettingTab", () => {
 		showMisses.checked = true;
 		showMisses.dispatchEvent(new Event("change"));
 		expect(host.updateSetting).toHaveBeenCalledWith("showMisses", true);
+	});
+
+	it("opens the cheatsheet from its button", () => {
+		const { t, host } = tab();
+		t.containerEl.querySelector("button")!.click();
+		expect(host.openCheatsheet).toHaveBeenCalled();
 	});
 
 	it("re-renders cleanly", () => {

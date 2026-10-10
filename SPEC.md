@@ -126,7 +126,7 @@ A modal opened by a command palette entry ("Pen Glyphs: Show cheatsheet") and op
 
 ## Settings
 
-Implemented so far (settings tab, `display()`-based; Obsidian 1.13's declarative `getSettingDefinitions()` is the successor to adopt once minAppVersion allows): glyph mode, show unrecognized strokes, debug panel.
+Implemented so far (settings tab, `display()`-based; Obsidian 1.13's declarative `getSettingDefinitions()` is the successor to adopt once minAppVersion allows): a cheatsheet button, glyph mode, show unrecognized strokes, developer tools (debug panel plus the dev commands, which are hidden from the command palette when off; default off).
 
 - Enable/disable per context (Canvas, Editor).
 - Show unrecognized strokes (flash "?"), default on.

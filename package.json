@@ -1,6 +1,6 @@
 {
   "name": "pen-glyphs",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Apple Pencil glyph commands for Obsidian on iPad",
   "type": "module",

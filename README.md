@@ -2,13 +2,13 @@
 
 Apple Pencil glyph commands for Obsidian Canvas on iPad. See [SPEC.md](SPEC.md).
 
-**Status: milestone 6 (copy/paste).** On iPad, pen glyphs act on Canvas: lasso selects, X deletes, square creates a card, a line connects two cards, a pen tap selects, caret copies and V pastes. A centered label names each action; "Pen Glyphs: Show cheatsheet" lists every glyph. Settings: glyph mode, show unrecognized strokes, debug panel.
+**Status: v1 complete.** On iPad, pen glyphs act on Canvas: lasso selects, X deletes, square creates a card, a line connects two cards, a pen tap selects, caret copies and V pastes. A centered label names each action. The cheatsheet (ribbon icon, settings, or "Pen Glyphs: Show cheatsheet") lists every glyph. Settings: glyph mode, show unrecognized strokes, developer tools (debug panel and dev commands; off by default).
 
 ## Dev setup
 
 ```sh
 npm install
-echo "/path/to/Test Vault" > .vault-path   # vault root (the folder containing .obsidian)
+echo "/path/to/Test Vault" > .vault-path   # vault roots (folders containing .obsidian), one per line
 npm run dev                                # watch; copies the plugin into the vault on every build
 npm test                                   # run tests (npm run test:watch to watch)
 npm run check                              # typecheck + tests with 100% coverage required

@@ -1,5 +1,6 @@
-// Bundles src/main.ts into build/ and, if .vault-path names a vault,
-// copies the plugin into <vault>/.obsidian/plugins/pen-glyphs/ on every build.
+// Bundles src/main.ts into build/ and copies the plugin into
+// <vault>/.obsidian/plugins/pen-glyphs/ for each vault listed in .vault-path
+// (one vault folder per line; blank lines and lines starting with # are ignored).
 // `npm run dev` watches; `npm run build` does a single production build.
 import esbuild from "esbuild";
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
@@ -11,25 +12,27 @@ const prod = process.argv[2] === "production";
 const version = JSON.parse(readFileSync("manifest.json", "utf8")).version;
 const PLUGIN_FILES = ["main.js", "manifest.json", "styles.css"];
 
-function pluginDir() {
-  if (!existsSync(".vault-path")) return null;
-  const vault = readFileSync(".vault-path", "utf8").trim();
-  if (!vault) return null;
-  if (!existsSync(join(vault, ".obsidian"))) {
+function pluginDirs() {
+  if (!existsSync(".vault-path")) return [];
+  const vaults = readFileSync(".vault-path", "utf8")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+  return vaults.flatMap((vault) => {
+    if (existsSync(join(vault, ".obsidian"))) return [join(vault, ".obsidian", "plugins", "pen-glyphs")];
     console.warn(`[pen-glyphs] .vault-path: no .obsidian folder in ${vault}; skipping copy`);
-    return null;
-  }
-  return join(vault, ".obsidian", "plugins", "pen-glyphs");
+    return [];
+  });
 }
 
 function deploy() {
   copyFileSync("manifest.json", "build/manifest.json");
   copyFileSync("styles.css", "build/styles.css");
-  const dest = pluginDir();
-  if (!dest) return;
-  mkdirSync(dest, { recursive: true });
-  for (const f of PLUGIN_FILES) copyFileSync(join("build", f), join(dest, f));
-  console.log(`[pen-glyphs] ${new Date().toLocaleTimeString()} copied to ${dest}`);
+  for (const dest of pluginDirs()) {
+    mkdirSync(dest, { recursive: true });
+    for (const f of PLUGIN_FILES) copyFileSync(join("build", f), join(dest, f));
+    console.log(`[pen-glyphs] ${new Date().toLocaleTimeString()} copied to ${dest}`);
+  }
 }
 
 const ctx = await esbuild.context({

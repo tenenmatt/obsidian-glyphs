@@ -12,6 +12,7 @@ type TestPlugin = PenGlyphsPlugin & {
 	commands: { id: string }[];
 	ribbon: { callback: (e: MouseEvent) => unknown }[];
 	runCommand(id: string): unknown;
+	isCommandAvailable(id: string): boolean;
 	unload(): void;
 	app: App;
 };
@@ -20,7 +21,8 @@ let frames: ReturnType<typeof manualFrames>;
 let draw: ReturnType<typeof fakeContext>;
 const loaded: TestPlugin[] = [];
 
-async function load(data: unknown = null, ipad = true): Promise<TestPlugin> {
+/** Load the plugin; developer tools are on unless `data` says otherwise, since most tests read the debug panel. */
+async function load(data: unknown = { showDebugPanel: true }, ipad = true): Promise<TestPlugin> {
 	Object.assign(Platform, { isIosApp: ipad, isTablet: ipad });
 	const plugin = new PenGlyphsPlugin(new App() as never, { id: "pen-glyphs", version: "9.9.9" } as never) as TestPlugin;
 	plugin.data = data;
@@ -70,12 +72,16 @@ afterEach(() => {
 });
 
 describe("activation", () => {
-	it("stays inactive off iPad, apart from the canvas inspector", async () => {
+	it("stays inactive off iPad, apart from the canvas dev commands (when developer tools are on)", async () => {
 		const log = vi.spyOn(console, "log").mockImplementation(() => {});
 		const plugin = await load(null, false);
 		expect(log).toHaveBeenCalledWith("[pen-glyphs] not an iPad; staying inactive");
 		expect(plugin.commands.map((c) => c.id)).toEqual(["inspect-canvas-internals", "probe-canvas-behavior"]);
+		expect(plugin.isCommandAvailable("inspect-canvas-internals")).toBe(false);
 		expect(document.querySelector(".pen-glyphs-overlay")).toBeNull();
+
+		const dev = await load({ showDebugPanel: true }, false);
+		expect(dev.isCommandAvailable("inspect-canvas-internals")).toBe(true);
 	});
 
 	it("needs both the iOS app and a tablet", async () => {
@@ -87,11 +93,22 @@ describe("activation", () => {
 		expect(plugin.commands.map((c) => c.id)).toEqual(["inspect-canvas-internals", "probe-canvas-behavior"]);
 	});
 
-	it("on iPad, shows the panel and overlay with default settings", async () => {
-		const plugin = await load();
-		expect(plugin.settings).toEqual({ glyphMode: true, showMisses: true, showDebugPanel: true });
+	it("on iPad with default settings, shows the overlay but not developer tools", async () => {
+		const plugin = await load(null);
+		expect(plugin.settings).toEqual({ glyphMode: true, showMisses: true, showDebugPanel: false });
 		expect(document.querySelector(".pen-glyphs-overlay")).not.toBeNull();
+		expect(document.querySelector(".pen-glyphs-debug")).toBeNull();
+		for (const id of ["inspect-canvas-internals", "probe-canvas-behavior", "save-last-gesture-fixture", "save-debug-log", "copy-debug-log", "clear-debug-log"]) {
+			expect(plugin.isCommandAvailable(id)).toBe(false);
+		}
+		expect(() => plugin.runCommand("save-debug-log")).toThrow("unavailable");
+		expect(plugin.isCommandAvailable("show-cheatsheet")).toBe(true);
+	});
+
+	it("with developer tools on, shows the debug panel and logs the running version", async () => {
+		const plugin = await load();
 		expect(panelText()).toContain("loaded test-build; glyph mode on");
+		expect(plugin.isCommandAvailable("save-debug-log")).toBe(true);
 	});
 
 	it("restores saved settings", async () => {
@@ -294,11 +311,13 @@ describe("settings and cheatsheet", () => {
 		expect(plugin.data).toMatchObject({ glyphMode: false, showMisses: false, showDebugPanel: true });
 	});
 
-	it("opens the cheatsheet", async () => {
+	it("opens the cheatsheet from the command and the ribbon", async () => {
 		const plugin = await load();
 		plugin.runCommand("show-cheatsheet");
 		expect(Modal.opened).toHaveLength(1);
 		expect(Modal.opened[0].contentEl.querySelectorAll(".pen-glyphs-cheatsheet-row")).toHaveLength(7);
+		plugin.ribbon[1].callback(new MouseEvent("click"));
+		expect(Modal.opened).toHaveLength(2);
 	});
 });
 
@@ -334,11 +353,12 @@ describe("canvas probe command", () => {
 			removeNode: () => {},
 		};
 		(plugin.app.workspace as unknown as FakeWorkspace).leaves = [{ view: { canvas } }];
+		// The probe waits for the editor to open, longer than runCommand's settle.
 		await plugin.runCommand("probe-canvas-behavior");
-		expect(Notice.shown[1]).toBe("Saved pen-glyphs-logs/canvas-probe 2026-10-09 12-00-00.md");
+		await vi.waitFor(() => expect(Notice.shown[1]).toBe("Saved pen-glyphs-logs/canvas-probe 2026-10-09 12-00-00.md"));
 
 		await plugin.runCommand("probe-canvas-behavior");
-		expect(Notice.shown[2]).toMatch(/^Probing canvas failed: Error: File already exists/);
+		await vi.waitFor(() => expect(Notice.shown[2]).toMatch(/^Probing canvas failed: Error: File already exists/));
 	});
 });
 
@@ -360,7 +380,7 @@ describe("commands and controls", () => {
 		expect(plugin.settings.glyphMode).toBe(false);
 	});
 
-	it("toggles the debug panel and remembers it", async () => {
+	it("toggles developer tools and remembers it", async () => {
 		const plugin = await load();
 		await plugin.runCommand("toggle-debug-panel");
 		expect(document.querySelector(".pen-glyphs-debug")).toBeNull();

@@ -79,7 +79,8 @@ export class Component {
 export interface Command {
 	id: string;
 	name: string;
-	callback: () => unknown;
+	callback?: () => unknown;
+	checkCallback?: (checking: boolean) => boolean | void;
 }
 
 export class Plugin extends Component {
@@ -115,10 +116,26 @@ export class Plugin extends Component {
 	}
 
 	/** Test helper: run a command by id. */
+	/**
+	 * Test helper: run a command by id, as the command palette would. A
+	 * checkCallback command must report itself available first; its (possibly
+	 * async) work is given a macrotask to finish before the returned promise resolves.
+	 */
 	runCommand(id: string): unknown {
 		const command = this.commands.find((c) => c.id === id);
 		if (!command) throw new Error(`no command ${id}`);
-		return command.callback();
+		if (command.checkCallback) {
+			if (!command.checkCallback(true)) throw new Error(`command ${id} is unavailable`);
+			command.checkCallback(false);
+			return new Promise((resolve) => setTimeout(resolve, 0));
+		}
+		return command.callback!();
+	}
+
+	/** Test helper: whether the command palette would list a command right now. */
+	isCommandAvailable(id: string): boolean {
+		const command = this.commands.find((c) => c.id === id);
+		return !!command && (!command.checkCallback || command.checkCallback(true) === true);
 	}
 }
 

@@ -96,8 +96,14 @@ export class PenCapture {
 		const a = this.active;
 		if (a && e.pointerId === a.pointerId) {
 			block(e);
+			// iPadOS sends one pointermove per Pencil sample, yet each one's coalesced
+			// list repeats every sample since the last frame. Keep only samples newer
+			// than the last one recorded.
 			const coalesced = e.getCoalescedEvents?.() ?? [];
-			const points = coalesced.length > 0 ? coalesced.map(toPoint) : [toPoint(e)];
+			const samples = coalesced.length > 0 ? coalesced.map(toPoint) : [toPoint(e)];
+			const lastT = a.points[a.points.length - 1].t;
+			const points = samples.filter((p) => p.t > lastT);
+			if (points.length === 0) return;
 			a.points.push(...points);
 			this.h.strokeMove(points);
 			return;

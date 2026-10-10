@@ -2,7 +2,7 @@
 
 Apple Pencil glyph commands for Obsidian Canvas on iPad. See [SPEC.md](SPEC.md).
 
-**Status: milestone 2 (stroke overlay).** On iPad, the pen is claimed on Canvas: it draws ink that fades out, shows a hover dot, and does nothing else yet. Fingers behave normally. Elsewhere the plugin stays inactive.
+**Status: milestone 3 (recognizer).** On iPad, pen strokes on Canvas are recognized as x, lasso, caret, v, square or line; the debug panel shows each result. No commands run yet. Fingers behave normally; elsewhere the plugin stays inactive.
 
 ## Dev setup
 
@@ -13,9 +13,19 @@ npm run dev                                # watch; copies the plugin into the v
 npm test                                   # run tests (npm run test:watch to watch)
 npm run check                              # typecheck + tests with 100% coverage required
 npm run build                              # check, then one production build
+node scripts/import-fixtures.mjs           # copy fixtures from the vault into test/fixtures (applies scripts/relabels.json)
+node scripts/build-templates.ts            # regenerate src/recognize/templates.ts from fixtures
 ```
 
 With Obsidian Sync, desktop Obsidian must have the test vault open to upload changes, and both devices need **Settings → Sync → Installed community plugins** and **Active community plugin list** turned on. On the iPad, reload the plugin by toggling it under Community plugins or by running "Reload app without saving".
+
+## Test protocol (milestone 3)
+
+Check that the debug panel title reads the expected version. Then, on a canvas with a few cards:
+
+1. Draw each glyph several times: x, lasso (around cards), caret (^), v, square (on empty space), line (card to card). Each should log `✓ <glyph>` and its ink should vanish almost at once.
+2. Draw some scribbles and letters. They should log `? no glyph` and their ink should turn gray, linger, then fade.
+3. When something is misread, press **save stroke** and label it with what you meant. Those fixtures become new test cases: `node scripts/import-fixtures.mjs`, then `node scripts/build-templates.ts` if templates should change.
 
 ## Test protocol (milestone 2)
 

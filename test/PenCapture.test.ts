@@ -88,6 +88,18 @@ describe("claiming the pen", () => {
 		]);
 	});
 
+	it("drops coalesced samples already recorded (iPadOS repeats them across events)", () => {
+		const { view, h } = ctx;
+		const sample = (t: number) => ({ clientX: t, clientY: 0, timeStamp: t, pressure: 0.5 });
+		pointer(view.card, "pointerdown", { t: 0 });
+		pointer(view.card, "pointermove", { t: 4, coalesced: [sample(2), sample(4)] });
+		pointer(view.card, "pointermove", { t: 4, coalesced: [sample(2), sample(4)] });
+		pointer(view.card, "pointermove", { t: 8, coalesced: [sample(6), sample(8)] });
+		pointer(view.card, "pointerup", { x: 8, t: 9 });
+		expect(h.strokeMove).toHaveBeenCalledTimes(2);
+		expect(h.strokeEnd.mock.calls[0][0].points.map((p: { t: number }) => p.t)).toEqual([0, 2, 4, 6, 8, 9]);
+	});
+
 	it("falls back to the event itself when getCoalescedEvents is missing or empty", () => {
 		const { view, h } = ctx;
 		pointer(view.card, "pointerdown", { t: 0 });

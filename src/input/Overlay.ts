@@ -5,10 +5,13 @@
 import { PenPoint, PenStroke } from "./strokes";
 
 // How long a finished stroke stays fully visible, then how long it takes to
-// fade. Recognition (milestone 3) will end the hold early.
+// fade. A recognized glyph clears almost at once; a miss lingers in gray so
+// it reads as "not understood".
 export const HOLD_MS = 400;
+export const RECOGNIZED_HOLD_MS = 80;
 export const FADE_MS = 250;
 export const TAP_FADE_MS = 200;
+export const MISS_COLOR = "#9a9a9a";
 // Ink width in CSS px at zero pressure and at FULL_PRESSURE or more. Normal
 // writing on the Pencil peaks around 0.1-0.3, so full width comes early.
 export const MIN_WIDTH = 2;
@@ -67,13 +70,22 @@ export class Overlay {
 		this.queueFrame();
 	}
 
-	end(stroke: PenStroke): void {
+	/** Finish the live stroke. `recognized` says whether it was understood as a glyph. */
+	end(stroke: PenStroke, recognized: boolean): void {
 		if (!this.live) return;
-		this.live.points = stroke.points;
-		this.live.kind = stroke.kind;
-		const tap = stroke.kind === "tap";
-		this.live.fadeAt = performance.now() + (tap ? 0 : HOLD_MS);
-		this.live.fadeMs = tap ? TAP_FADE_MS : FADE_MS;
+		const ink = this.live;
+		ink.points = stroke.points;
+		ink.kind = stroke.kind;
+		const now = performance.now();
+		if (stroke.kind === "tap") {
+			ink.fadeAt = now;
+			ink.fadeMs = TAP_FADE_MS;
+		} else if (recognized) {
+			ink.fadeAt = now + RECOGNIZED_HOLD_MS;
+		} else {
+			ink.color = MISS_COLOR;
+			ink.fadeAt = now + HOLD_MS;
+		}
 		this.live = null;
 		this.queueFrame();
 	}

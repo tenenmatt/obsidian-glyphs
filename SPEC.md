@@ -59,10 +59,16 @@ src/
 
 ## Recognition
 
-- Use the **$P point-cloud recognizer** (handles multistroke glyphs like a two-stroke X) or **$1 Unistroke** if keeping v1 single-stroke. Reference JS implementations exist from the University of Washington ($1, $N, $P pages under depts.washington.edu/madlab/proj/dollar/). Check their license before vendoring; otherwise reimplement (both are small).
-- Multistroke (deferred, see Decisions): group strokes that start within ~300 ms of the previous stroke ending into one gesture.
-- Return `{name, score}`. Below a configurable threshold, show a subtle "?" flash and do nothing.
-- Ship built-in templates; v2 lets users record their own templates in settings.
+Single strokes, recognized the moment the pen lifts (`src/recognize/`). Each glyph uses whatever separates it best on real Pencil input:
+
+1. Bounding-box diagonal under 24 px: not a glyph.
+2. Straightness (end-to-end distance / path length) ≥ 0.85: **line**.
+3. Closes on itself (either end comes back near the other end's first/last 30% of the path): a loop. Too much ink for one loop (> 1.25× the bounding-box perimeter) is a scribble-out → none. Otherwise count sharp corners: 0–2 → **lasso**; 3–5 and rectangular (convex hull fills ≥ 0.7 of the bounding box) → **square**; anything else → none.
+4. Otherwise **$P** (ported from the reference implementation, BSD notice kept) against built-in templates for **x**, **caret** and **v**; nearest template within distance 1.15 wins, else none. $P is orientation-sensitive, which tells caret from v.
+
+Thresholds were tuned on 105 fixtures recorded on the author's iPad (`test/fixtures/gestures.json`, imported by `scripts/import-fixtures.mjs`). Templates are generated from every other x/caret/v fixture by `scripts/build-templates.ts`; the test suite requires every held-out fixture to be recognized correctly and every scribble rejected. Templates are the author's own strokes, so an idealized textbook x is (correctly, for now) not recognized; v2 lets users record their own.
+
+Misses gray out the ink; hits clear it almost immediately. The debug panel logs each result with the nearest alternatives.
 
 ## Glyph vocabulary (v1, Canvas)
 
@@ -123,7 +129,7 @@ A modal opened by a command palette entry ("Pen Glyphs: Show cheatsheet") and op
 ## Milestones
 
 1. ✅ **Input spike:** on iPad, log `pointerType` for pen vs finger on a Canvas, and confirm `preventDefault` on pen stops panning while fingers still pan. *This validates the whole approach; stop and reassess if it fails.*
-2. Stroke overlay rendering, hover dot, fixture recording.
+2. ✅ Stroke overlay rendering, hover dot, fixture recording.
 3. Recognizer with X and lasso; debug panel showing scores.
 4. `CanvasAdapter`: hit-test, select, delete with undo.
 5. Flash notices and cheatsheet.
@@ -155,7 +161,7 @@ From the first on-device log (2026-10-09, Obsidian 1.14.4, M5 iPad Pro + Pencil 
 - **Chosen: block both (mode `all`).** Confirmed with the full protocol: no pen effect on Canvas (no pan, drag, select, or compatibility mouse events), finger pan/pinch/drag unaffected, Scribble inside an editing card unaffected.
 - Scribble consumes pen strokes natively: while writing in an editing card, no pointer or touch events reach the web view at all (not even hover). The "ignore pen in editing node" check never fired. Pen strokes that start outside the editing card do reach us and are blocked, so with glyphs on, ending an edit needs a finger tap.
 - Pencil hover arrives as pen `pointermove` with `buttons === 0`; position only, angles read as constant (`altitudeAngle` π/2, `azimuthAngle` 0) while hovering.
-- `getCoalescedEvents()` works (~2 samples per event). Pressure and tilt/altitude/azimuth are reported on contact.
+- `getCoalescedEvents()` works, but iPadOS dispatches one `pointermove` per Pencil sample (~240 Hz) while each event's coalesced list repeats every sample since the last frame, so naive use records each point twice. Keep only samples newer than the last recorded one. Pressure and tilt/altitude/azimuth are reported on contact.
 
 ## Open questions to verify early
 

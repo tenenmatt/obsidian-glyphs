@@ -1,7 +1,10 @@
 import { App, FakeVault, Modal, Notice, Platform } from "./obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PenGlyphsPlugin from "../src/main";
+import { MISS_COLOR } from "../src/input/Overlay";
+import { PenPoint } from "../src/input/strokes";
 import { canvasView, fakeContext, manualFrames, pointer } from "./helpers";
+import { shapes } from "./shapes";
 
 type TestPlugin = PenGlyphsPlugin & {
 	data: unknown;
@@ -36,6 +39,15 @@ function panelButton(label: string): HTMLButtonElement {
 	const found = all.find((b) => b.textContent!.startsWith(label));
 	if (!found) throw new Error(`no panel button ${label}`);
 	return found;
+}
+
+/** Draw a whole stroke with the pen: down, moves, up. */
+function drawStroke(target: Element, points: PenPoint[]) {
+	const [first, ...rest] = points;
+	pointer(target, "pointerdown", { x: first.x, y: first.y, t: first.t, p: first.p });
+	for (const q of rest.slice(0, -1)) pointer(target, "pointermove", { x: q.x, y: q.y, t: q.t, p: q.p });
+	const last = rest[rest.length - 1];
+	pointer(target, "pointerup", { x: last.x, y: last.y, t: last.t, p: last.p });
 }
 
 async function settle() {
@@ -107,7 +119,30 @@ describe("pen input", () => {
 		frames.flush();
 		expect(draw.ops("stroke").length).toBeGreaterThan(0);
 		pointer(card, "pointerup", { x: 30, y: 40, t: 250 });
-		expect(panelText()).toContain("stroke: 3 pts, 250ms, length 50px, box 30×40, max pressure 0.60");
+		const text = panelText();
+		expect(text).toContain("✓ line (straightness 1.00)");
+		expect(text).toContain("    3 pts, 250ms, length 50px, box 30×40, max pressure 0.60");
+	});
+
+	it("recognizes a glyph, clearing its ink quickly in the accent color", async () => {
+		await load();
+		const { card } = canvasView();
+		const caret = shapes.caret();
+		draw.reset();
+		drawStroke(card, caret);
+		expect(panelText()).toMatch(/✓ caret \(\$P distance \d\.\d\d; next: /);
+		frames.flush();
+		expect(draw.ops("stroke").every((c) => c.style !== MISS_COLOR)).toBe(true);
+	});
+
+	it("marks a stroke it cannot read, graying its ink", async () => {
+		await load();
+		const { card } = canvasView();
+		drawStroke(card, shapes.zigzag());
+		expect(panelText()).toMatch(/\? no glyph \(nearest /);
+		draw.reset();
+		frames.flush();
+		expect(draw.ops("stroke")[0].style).toBe(MISS_COLOR);
 	});
 
 	it("logs a tap with its target", async () => {

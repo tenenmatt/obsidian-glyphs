@@ -6,7 +6,9 @@ import {
 	HOVER_RADIUS,
 	MAX_WIDTH,
 	MIN_WIDTH,
+	MISS_COLOR,
 	Overlay,
+	RECOGNIZED_HOLD_MS,
 	TAP_FADE_MS,
 } from "../src/input/Overlay";
 import { clock, fakeContext, manualFrames, pt, stroke } from "./helpers";
@@ -101,13 +103,28 @@ describe("ink", () => {
 		expect(frames.pending).toBe(0);
 	});
 
-	it("holds a finished stroke, fades it out, then removes it", () => {
+	it("clears a recognized stroke almost at once, in its own color", () => {
+		overlay.begin(pt(0, 0, 0));
+		overlay.end(stroke([pt(0, 0, 0), pt(50, 0, 300)]), true);
+		time.advance(RECOGNIZED_HOLD_MS + FADE_MS / 2);
+		frames.flush();
+		const [segment] = draw.ops("stroke");
+		expect(segment.alpha).toBeCloseTo(0.5);
+		expect(segment.style).toBe("#ff0000");
+		time.advance(FADE_MS);
+		draw.reset();
+		frames.flush();
+		expect(draw.ops("stroke")).toHaveLength(0);
+	});
+
+	it("grays out a missed stroke, holds it, fades it out, then removes it", () => {
 		overlay.begin(pt(0, 0, 0));
 		overlay.extend([pt(50, 0, 300)]);
-		overlay.end(stroke([pt(0, 0, 0), pt(50, 0, 300)]));
+		overlay.end(stroke([pt(0, 0, 0), pt(50, 0, 300)]), false);
 
 		frames.flush();
 		expect(draw.ops("stroke")[0].alpha).toBe(1);
+		expect(draw.ops("stroke")[0].style).toBe(MISS_COLOR);
 
 		time.advance(HOLD_MS + FADE_MS / 2);
 		draw.reset();
@@ -123,14 +140,14 @@ describe("ink", () => {
 
 	it("uses the final stroke's points when it ends", () => {
 		overlay.begin(pt(0, 0, 0));
-		overlay.end(stroke([pt(0, 0, 0), pt(30, 0, 300)]));
+		overlay.end(stroke([pt(0, 0, 0), pt(30, 0, 300)]), true);
 		frames.flush();
 		expect(draw.ops("lineTo")[0].args).toEqual([30, 0]);
 	});
 
 	it("fades a tap immediately and quickly", () => {
 		overlay.begin(pt(5, 5, 0));
-		overlay.end(stroke([pt(5, 5, 0)], "tap"));
+		overlay.end(stroke([pt(5, 5, 0)], "tap"), false);
 		time.advance(TAP_FADE_MS / 2);
 		frames.flush();
 		const [dot] = draw.ops("fill");
@@ -143,7 +160,7 @@ describe("ink", () => {
 
 	it("draws a tap as a dot even if the tap wobbled", () => {
 		overlay.begin(pt(5, 5, 0));
-		overlay.end(stroke([pt(5, 5, 0), pt(6, 5, 50)], "tap"));
+		overlay.end(stroke([pt(5, 5, 0), pt(6, 5, 50)], "tap"), false);
 		frames.flush();
 		expect(draw.ops("arc")).toHaveLength(1);
 		expect(draw.ops("stroke")).toHaveLength(0);
@@ -160,7 +177,7 @@ describe("ink", () => {
 
 	it("ignores extend, end and cancel with no live stroke", () => {
 		overlay.extend([pt(1, 1, 1)]);
-		overlay.end(stroke([pt(1, 1, 1)]));
+		overlay.end(stroke([pt(1, 1, 1)]), true);
 		overlay.cancel();
 		expect(frames.pending).toBe(0);
 	});
@@ -168,7 +185,7 @@ describe("ink", () => {
 	it("keeps an earlier stroke fading while a new one is drawn", () => {
 		overlay.begin(pt(0, 0, 0));
 		overlay.extend([pt(10, 0, 10)]);
-		overlay.end(stroke([pt(0, 0, 0), pt(10, 0, 300)]));
+		overlay.end(stroke([pt(0, 0, 0), pt(10, 0, 300)]), false);
 		overlay.begin(pt(100, 0, 400));
 		overlay.extend([pt(110, 0, 410)]);
 		frames.flush();

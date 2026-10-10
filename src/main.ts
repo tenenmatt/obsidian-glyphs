@@ -3,6 +3,8 @@ import { GestureLog, SaveFixtureModal } from "./dev/fixtures";
 import { Overlay } from "./input/Overlay";
 import { PenCapture } from "./input/PenCapture";
 import { PenStroke, strokeStats } from "./input/strokes";
+import { Recognizer, describeRecognition } from "./recognize/Recognizer";
+import { TEMPLATES } from "./recognize/templates";
 import { DebugPanel } from "./ui/DebugPanel";
 import { describe } from "./util/dom";
 
@@ -22,6 +24,7 @@ export default class PenGlyphsPlugin extends Plugin {
 	private panel!: DebugPanel;
 	private overlay!: Overlay;
 	private gestures = new GestureLog();
+	private recognizer = new Recognizer(TEMPLATES);
 
 	override async onload(): Promise<void> {
 		const data = (await this.loadData()) ?? {};
@@ -89,16 +92,19 @@ export default class PenGlyphsPlugin extends Plugin {
 	}
 
 	private onStroke(stroke: PenStroke): void {
-		this.overlay.end(stroke);
 		this.gestures.add(stroke);
 		const first = stroke.points[0];
 		if (stroke.kind === "tap") {
+			this.overlay.end(stroke, false);
 			this.panel.log(`tap at (${Math.round(first.x)},${Math.round(first.y)}) on ${describe(stroke.target)}`);
 			return;
 		}
+		const result = this.recognizer.recognize(stroke.points);
+		this.overlay.end(stroke, result.glyph !== null);
 		const s = strokeStats(stroke.points);
 		this.panel.log(
-			`stroke: ${stroke.points.length} pts, ${Math.round(s.ms)}ms, length ${Math.round(s.length)}px,` +
+			`${result.glyph ? "✓" : "?"} ${describeRecognition(result)}\n` +
+				`    ${stroke.points.length} pts, ${Math.round(s.ms)}ms, length ${Math.round(s.length)}px,` +
 				` box ${Math.round(s.width)}×${Math.round(s.height)}, max pressure ${s.maxPressure.toFixed(2)}`,
 		);
 	}

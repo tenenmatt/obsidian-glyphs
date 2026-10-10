@@ -1,4 +1,5 @@
 import { Notice, Platform, Plugin } from "obsidian";
+import { saveCanvasReport } from "./dev/canvasInspector";
 import { GestureLog, SaveFixtureModal } from "./dev/fixtures";
 import { Overlay } from "./input/Overlay";
 import { PenCapture } from "./input/PenCapture";
@@ -32,6 +33,13 @@ export default class PenGlyphsPlugin extends Plugin {
 			glyphMode: data.glyphMode ?? DEFAULT_SETTINGS.glyphMode,
 			showDebugPanel: data.showDebugPanel ?? DEFAULT_SETTINGS.showDebugPanel,
 		};
+
+		// Dev: available everywhere, since desktop Canvas has the same internals.
+		this.addCommand({
+			id: "inspect-canvas-internals",
+			name: "Inspect canvas internals (dev)",
+			callback: () => this.inspectCanvas(),
+		});
 
 		if (!(Platform.isIosApp && Platform.isTablet)) {
 			console.log("[pen-glyphs] not an iPad; staying inactive");
@@ -107,6 +115,15 @@ export default class PenGlyphsPlugin extends Plugin {
 				`    ${stroke.points.length} pts, ${Math.round(s.ms)}ms, length ${Math.round(s.length)}px,` +
 				` box ${Math.round(s.width)}×${Math.round(s.height)}, max pressure ${s.maxPressure.toFixed(2)}`,
 		);
+	}
+
+	private async inspectCanvas(): Promise<void> {
+		try {
+			const path = await saveCanvasReport(this.app);
+			new Notice(path ? `Saved ${path}` : "Open a canvas first");
+		} catch (err) {
+			new Notice(`Inspecting canvas failed: ${String(err)}`);
+		}
 	}
 
 	private openSaveFixture(): void {

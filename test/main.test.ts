@@ -1,4 +1,4 @@
-import { App, FakeVault, Modal, Notice, Platform } from "./obsidian";
+import { App, FakeVault, FakeWorkspace, Modal, Notice, Platform } from "./obsidian";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PenGlyphsPlugin from "../src/main";
 import { MISS_COLOR } from "../src/input/Overlay";
@@ -65,11 +65,11 @@ afterEach(() => {
 });
 
 describe("activation", () => {
-	it("stays inactive off iPad", async () => {
+	it("stays inactive off iPad, apart from the canvas inspector", async () => {
 		const log = vi.spyOn(console, "log").mockImplementation(() => {});
 		const plugin = await load(null, false);
 		expect(log).toHaveBeenCalledWith("[pen-glyphs] not an iPad; staying inactive");
-		expect(plugin.commands).toEqual([]);
+		expect(plugin.commands.map((c) => c.id)).toEqual(["inspect-canvas-internals"]);
 		expect(document.querySelector(".pen-glyphs-overlay")).toBeNull();
 	});
 
@@ -79,7 +79,7 @@ describe("activation", () => {
 		const plugin = new PenGlyphsPlugin(new App() as never, { id: "pen-glyphs", version: "1" } as never) as TestPlugin;
 		loaded.push(plugin);
 		await plugin.onload();
-		expect(plugin.commands).toEqual([]);
+		expect(plugin.commands.map((c) => c.id)).toEqual(["inspect-canvas-internals"]);
 	});
 
 	it("on iPad, shows the panel and overlay with default settings", async () => {
@@ -183,6 +183,25 @@ describe("pen input", () => {
 		const { card } = canvasView();
 		const down = pointer(card, "pointerdown");
 		expect(down.defaultPrevented).toBe(false);
+	});
+});
+
+describe("canvas inspector command", () => {
+	it("asks for a canvas when none is open", async () => {
+		const plugin = await load();
+		await plugin.runCommand("inspect-canvas-internals");
+		expect(Notice.shown).toEqual(["Open a canvas first"]);
+	});
+
+	it("saves a report, and reports failures", async () => {
+		const plugin = await load();
+		(plugin.app.workspace as unknown as FakeWorkspace).leaves = [{ view: { canvas: { zoom: 1 } } }];
+		await plugin.runCommand("inspect-canvas-internals");
+		const path = "pen-glyphs-logs/canvas-api 2026-10-09 12-00-00.md";
+		expect(Notice.shown).toEqual([`Saved ${path}`]);
+
+		await plugin.runCommand("inspect-canvas-internals");
+		expect(Notice.shown[1]).toBe(`Inspecting canvas failed: Error: File already exists: ${path}`);
 	});
 });
 

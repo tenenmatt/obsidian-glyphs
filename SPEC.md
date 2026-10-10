@@ -76,13 +76,13 @@ Misses gray out the ink; hits clear it almost immediately. The debug panel logs 
 
 | Glyph | Drawn over | Command |
 |---|---|---|
-| X | a node | Delete node(s) under the X |
-| Lasso (closed loop) | any area | Select nodes whose centers are inside the loop |
+| X | a node | If the X hits a selected card, delete the whole selection; otherwise delete the card(s) under the X. No need to select first. |
+| Lasso (closed loop) | any area | Select nodes whose centers are inside the loop; a lasso around nothing clears the selection |
 | Caret ^ | a node or selection | Copy (Allume's model) |
 | V | empty space | Paste at the V's point (Allume's model) |
-| Square (closed, cornered) | empty space | Create a text card filling the square's bounds |
-| Pen tap | a node | Select node |
-| Line from one card to another | two nodes | Connect them with an edge, from the card where the stroke starts to the card where it ends; any direction, slight curves fine (stretch goal) |
+| Square (closed, cornered) | empty space | Create a text card filling the square's bounds and open it for editing |
+| Pen tap | a node / empty canvas | Select the node / clear the selection |
+| Line from one card to another | two nodes | Connect them with an edge with an arrow at the card where the stroke ends; any direction, slight curves fine |
 
 Lasso vs square: both are closed loops. Context decides first: a closed loop that encloses one or more card centers is a lasso (select), whatever its shape; a closed loop over empty space is a square (new card) if it has corners. This keeps a rectangular lasso around cards from creating a card.
 
@@ -133,7 +133,7 @@ A modal opened by a command palette entry ("Pen Glyphs: Show cheatsheet") and op
 1. ✅ **Input spike:** on iPad, log `pointerType` for pen vs finger on a Canvas, and confirm `preventDefault` on pen stops panning while fingers still pan. *This validates the whole approach; stop and reassess if it fails.*
 2. ✅ Stroke overlay rendering, hover dot, fixture recording.
 3. Recognizer with X and lasso; debug panel showing scores.
-4. `CanvasAdapter`: hit-test, select, delete with undo.
+4. `CanvasAdapter` and canvas commands: lasso select, X delete (with undo), square new card, line connect, pen tap select. Starts with a dev command that dumps the Canvas internals available in the running Obsidian version.
 5. Flash notices and cheatsheet.
 6. Copy/paste glyphs, settings, glyph-mode toggle.
 7. v2: editor glyphs, custom templates, finger-as-modifier.

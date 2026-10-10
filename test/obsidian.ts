@@ -2,6 +2,8 @@
 // "obsidian" in vitest.config.ts. Test-only helpers (Notice.shown, FakeVault,
 // Plugin.commands, ...) are not part of the real API.
 
+export const apiVersion = "1.0.0-test";
+
 export const Platform = {
 	isIosApp: false,
 	isTablet: false,
@@ -36,8 +38,20 @@ export class FakeVault {
 	}
 }
 
+export class FakeWorkspace {
+	leaves: { view: unknown }[] = [];
+	mostRecent: { view: unknown } | null = null;
+	getLeavesOfType(type: string): { view: unknown }[] {
+		return type === "canvas" ? this.leaves : [];
+	}
+	getMostRecentLeaf(): { view: unknown } | null {
+		return this.mostRecent;
+	}
+}
+
 export class App {
 	vault = new FakeVault();
+	workspace = new FakeWorkspace();
 }
 
 export class Component {

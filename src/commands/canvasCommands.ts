@@ -3,7 +3,7 @@
 
 import { Pt, bounds, pointInPolygon } from "../recognize/features";
 import { GlyphName } from "../recognize/Recognizer";
-import { CanvasAdapter, CanvasNode, Rect } from "../targets/CanvasAdapter";
+import { CanvasAdapter, CanvasNode, Rect, Side } from "../targets/CanvasAdapter";
 
 export type CanvasGesture = GlyphName | "tap";
 
@@ -69,13 +69,54 @@ function cross(canvas: CanvasAdapter, points: Pt[]): string {
 	return "deleted card";
 }
 
-/** Connect the card under the start of the stroke to the card under its end. */
+/**
+ * Connect the card under the start of the stroke to the card under its end,
+ * attaching the arrow to the side the stroke left from and the side it
+ * entered by.
+ */
 function line(canvas: CanvasAdapter, points: Pt[]): string {
 	const from = canvas.cardAt(points[0]);
 	const to = canvas.cardAt(points[points.length - 1]);
 	if (!from || !to || from === to) return "connect: start and end on two different cards";
-	canvas.connect(from, to);
-	return "connected cards";
+	// The first point after the stroke last leaves `from`, and the last point
+	// before it first enters `to`. Overlapping cards may leave no such point.
+	const lastOnFrom = points.map((p) => contains(from, p)).lastIndexOf(true);
+	const firstOnTo = points.findIndex((p) => contains(to, p));
+	const fromSide = sideCrossed(from, points[lastOnFrom + 1] ?? points[lastOnFrom]);
+	const toSide = sideCrossed(to, points[firstOnTo - 1] ?? points[firstOnTo]);
+	canvas.connect(from, to, { fromSide, toSide });
+	return `connected cards (${fromSide} → ${toSide})`;
+}
+
+function contains(card: CanvasNode, p: Pt): boolean {
+	return p.x >= card.x && p.x <= card.x + card.width && p.y >= card.y && p.y <= card.y + card.height;
+}
+
+/**
+ * The side of `card` a stroke crossed to reach `outside`, a point just beyond
+ * the card: whichever side it lies furthest beyond. A point on the card falls
+ * back to the nearest side.
+ */
+export function sideCrossed(card: CanvasNode, outside: Pt): Side {
+	const beyond: [Side, number][] = [
+		["top", card.y - outside.y],
+		["bottom", outside.y - (card.y + card.height)],
+		["left", card.x - outside.x],
+		["right", outside.x - (card.x + card.width)],
+	];
+	const [side, distance] = beyond.reduce((best, b) => (b[1] > best[1] ? b : best));
+	return distance > 0 ? side : nearestSide(card, outside);
+}
+
+/** The side of `card` closest to a point on or near it. */
+export function nearestSide(card: CanvasNode, p: Pt): Side {
+	const distances: [Side, number][] = [
+		["top", Math.abs(p.y - card.y)],
+		["bottom", Math.abs(card.y + card.height - p.y)],
+		["left", Math.abs(p.x - card.x)],
+		["right", Math.abs(card.x + card.width - p.x)],
+	];
+	return distances.reduce((best, d) => (d[1] < best[1] ? d : best))[0];
 }
 
 function toRect(points: Pt[]): Rect {

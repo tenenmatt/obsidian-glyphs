@@ -14,6 +14,8 @@ export interface FakeEdge {
 	id: string;
 	fromNode: string;
 	toNode: string;
+	fromSide?: string;
+	toSide?: string;
 	toEnd?: string;
 }
 

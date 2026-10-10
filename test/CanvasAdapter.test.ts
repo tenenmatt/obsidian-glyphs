@@ -100,6 +100,12 @@ describe("CanvasAdapter", () => {
 		expect(canvas.edges).toEqual([{ id: expect.stringMatching(/^[0-9a-f]{16}$/), fromNode: a.id, toNode: b.id, toEnd: "arrow" }]);
 		expect(canvas.saves).toBe(1);
 	});
+
+	it("attaches the arrow to the requested sides", () => {
+		const { canvas, adapter } = adapt();
+		adapter.connect(canvas.addCard(0, 0), canvas.addCard(0, 300), { fromSide: "right", toSide: "left" });
+		expect(canvas.edges[0]).toMatchObject({ fromSide: "right", toSide: "left" });
+	});
 });
 
 describe("canvasViewFor", () => {

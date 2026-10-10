@@ -23,18 +23,19 @@ export interface StrokeStats {
 	maxPressure: number;
 }
 
-// A pen contact shorter than this, that never strays farther than TAP_MAX_DIST
-// from where it started, is a tap rather than a stroke.
-export const TAP_MAX_MS = 200;
-export const TAP_MAX_DIST = 8;
+// A pen contact no longer than this, whose bounding box is smaller across
+// than TAP_MAX_SIZE, is a tap. Real taps on the iPad drift up to ~15px in
+// ~100ms; TAP_MAX_SIZE matches the recognizer's minimum glyph size, so every
+// quick contact is either a tap or big enough to be a glyph.
+export const TAP_MAX_MS = 250;
+export const TAP_MAX_SIZE = 24;
 
 /** Classify a non-empty point list as a tap or a stroke. */
 export function classify(points: PenPoint[]): StrokeKind {
-	const first = points[0];
-	const duration = points[points.length - 1].t - first.t;
+	const duration = points[points.length - 1].t - points[0].t;
 	if (duration > TAP_MAX_MS) return "stroke";
-	const strayed = points.some((p) => Math.hypot(p.x - first.x, p.y - first.y) > TAP_MAX_DIST);
-	return strayed ? "stroke" : "tap";
+	const s = strokeStats(points);
+	return Math.hypot(s.width, s.height) < TAP_MAX_SIZE ? "tap" : "stroke";
 }
 
 /** Duration, path length, bounding box and peak pressure of a non-empty point list. */

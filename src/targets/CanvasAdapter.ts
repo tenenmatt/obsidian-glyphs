@@ -18,6 +18,8 @@ export interface Rect {
 	maxY: number;
 }
 
+export type Side = "top" | "right" | "bottom" | "left";
+
 /** A card. Position is its top-left corner, in canvas coordinates. */
 export interface CanvasNode {
 	id: string;
@@ -131,13 +133,16 @@ export class CanvasAdapter {
 		});
 	}
 
-	/** Connect two cards with an arrow pointing at `to`. Canvas picks the sides. Undoable. */
-	connect(from: CanvasNode, to: CanvasNode): void {
+	/**
+	 * Connect two cards with an arrow pointing at `to`, attached to the given
+	 * sides; Canvas picks any side left out. Undoable.
+	 */
+	connect(from: CanvasNode, to: CanvasNode, sides: { fromSide?: Side; toSide?: Side } = {}): void {
+		const edge: Record<string, string> = { id: newId(), fromNode: from.id, toNode: to.id, toEnd: "arrow" };
+		if (sides.fromSide) edge.fromSide = sides.fromSide;
+		if (sides.toSide) edge.toSide = sides.toSide;
 		// Without the `clear` flag, importData only adds: it never removes cards or edges.
-		this.canvas.importData({
-			nodes: [],
-			edges: [{ id: newId(), fromNode: from.id, toNode: to.id, toEnd: "arrow" }],
-		});
+		this.canvas.importData({ nodes: [], edges: [edge] });
 		this.canvas.requestSave();
 	}
 

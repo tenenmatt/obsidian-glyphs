@@ -54,7 +54,7 @@ src/
 3. Collect points `{x, y, t, pressure}` in client coordinates. Use `getCoalescedEvents()` when available for smoother strokes (feature-detect; don't assume support).
 4. Render the live stroke on an overlay `<canvas>` (pointer-events: none, devicePixelRatio-aware). Fade it out after recognition.
 5. Finger (`touch`) events pass through untouched, so pan/zoom/drag keep working. Track active touches so a finger held down during a pen stroke can act as a modifier (v2).
-6. **Taps:** a pen stroke shorter than ~8 px and ~200 ms is a tap, not a glyph. Pen tap on a node = select it; pen tap on empty canvas = pass through to default behavior (or create a text node; make configurable).
+6. **Taps:** a pen contact of at most 250 ms whose bounding box is under 24 px across is a tap, not a glyph. (Real taps drift up to ~15 px; 24 px is also the recognizer's minimum glyph size, so no quick contact falls between the two.) Pen tap on a node = select it; pen tap on empty canvas = pass through to default behavior (or create a text node; make configurable).
 7. Ignore pen input while a Canvas text node is in edit mode, so writing/Scribble inside nodes still works.
 
 ## Recognition
@@ -82,7 +82,7 @@ Misses gray out the ink; hits clear it almost immediately. The debug panel logs 
 | V | empty space | Paste at the V's point (Allume's model) |
 | Square (closed, cornered) | empty space | Create a text card filling the square's bounds and open it for editing |
 | Pen tap | a node / empty canvas | Select the node / clear the selection |
-| Line from one card to another | two nodes | Connect them with an edge with an arrow at the card where the stroke ends; any direction, slight curves fine |
+| Line from one card to another | two nodes | Connect them with an edge with an arrow at the card where the stroke ends; any direction, slight curves fine. The edge attaches to the side the stroke last left the first card through and the side it first entered the second card by. |
 
 Lasso vs square: both are closed loops. Context decides first: a closed loop that encloses one or more card centers is a lasso (select), whatever its shape; a closed loop over empty space is a square (new card) if it has corners. This keeps a rectangular lasso around cards from creating a card.
 
@@ -101,7 +101,7 @@ Confirmed on Obsidian 1.14.4 (desktop) with the "Inspect canvas internals" and "
 - Selection: `selection` (Set), `selectOnly`, `selectAll(items)`, `deselectAll`.
 - Delete: `removeNode(node)` (also removes its edges), `deleteSelection()`.
 - Create: `createTextNode({pos, size, text, focus, save})`. `pos` is the top-left corner. `focus` (default true) selects the card and calls `startEditing()`.
-- Connect: no create-edge method. `importData({nodes: [], edges: [edge]})` adds an edge; without its second (`clear`) argument it never removes anything. Omitted `fromSide`/`toSide` are chosen by Canvas.
+- Connect: no create-edge method. `importData({nodes: [], edges: [edge]})` adds an edge; without its second (`clear`) argument it never removes anything. `fromSide`/`toSide` (`top`/`right`/`bottom`/`left`) set where the edge attaches; omitted ones are chosen by Canvas from the cards' relative positions.
 - Undo: `requestSave()` records a history entry (debounced), so Canvas's own undo/redo reverts glyph commands. `createTextNode` saves unless `save: false`.
 
 ## Editor (v2)

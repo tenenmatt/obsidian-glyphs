@@ -1,19 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { TAP_MAX_DIST, TAP_MAX_MS, classify, lastGesture, strokeStats } from "../src/input/strokes";
+import { TAP_MAX_MS, TAP_MAX_SIZE, classify, lastGesture, strokeStats } from "../src/input/strokes";
 import { pt, stroke } from "./helpers";
 
 describe("classify", () => {
-	it("calls a short, still contact a tap", () => {
+	it("calls a quick, small contact a tap, even if it drifts", () => {
 		expect(classify([pt(10, 10, 0)])).toBe("tap");
-		expect(classify([pt(10, 10, 0), pt(10 + TAP_MAX_DIST, 10, TAP_MAX_MS)])).toBe("tap");
+		// A real missed tap from the iPad: 108ms, 6x14px.
+		expect(classify([pt(10, 10, 0), pt(16, 24, TAP_MAX_MS)])).toBe("tap");
 	});
 
 	it("calls a long contact a stroke even if it never moved", () => {
 		expect(classify([pt(10, 10, 0), pt(10, 10, TAP_MAX_MS + 1)])).toBe("stroke");
 	});
 
-	it("calls a quick contact that strayed a stroke", () => {
-		expect(classify([pt(10, 10, 0), pt(10, 10 + TAP_MAX_DIST + 1, 50), pt(10, 10, 60)])).toBe("stroke");
+	it("calls a quick contact as big as a glyph a stroke", () => {
+		expect(classify([pt(10, 10, 0), pt(10, 10 + TAP_MAX_SIZE, 50), pt(10, 10, 60)])).toBe("stroke");
 	});
 });
 

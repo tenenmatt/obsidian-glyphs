@@ -8,6 +8,7 @@
 //   anything else           -> $P template match among x / caret / v
 // $P is orientation-sensitive, which is what tells caret from v.
 
+import { TAP_MAX_SIZE } from "../input/strokes";
 import { bounds, closure, corners, hullFill, inkRatio, straightness, Pt } from "./features";
 import { Match, Template, normalize, rank } from "./pdollar";
 
@@ -18,8 +19,8 @@ export type Recognition =
 	| { glyph: null; reason: string; matches?: Match[] };
 
 export const thresholds = {
-	/** Below this bounding-box diagonal (px), a stroke is too small to be a glyph. */
-	minSize: 24,
+	/** Below this bounding-box diagonal (px), a stroke is too small to be a glyph. Quick ones are taps (TAP_MAX_SIZE). */
+	minSize: TAP_MAX_SIZE,
 	/** Lines measure 0.86-0.99; the straightest non-line fixture, a squiggle, 0.80. */
 	lineStraightness: 0.85,
 	/** Lassos and squares measure 0-0.06; the most closed open glyph (an x) 0.16. */

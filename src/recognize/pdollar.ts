@@ -1,45 +1,77 @@
 /**
- * The $P Point-Cloud Recognizer, ported to TypeScript from the reference
- * JavaScript implementation (pdollar.js, last updated July 14, 2018):
+ * @license BSD-3-Clause
+ *
+ * The $P Point-Cloud Recognizer, ported to TypeScript by Matt Tenenbaum (with
+ * Claude Code) from the reference JavaScript implementation, pdollar.js
+ * (last updated July 14, 2018), published by its authors at
  * https://depts.washington.edu/acelab/proj/dollar/pdollar.html
+ * and redistributed here under its New BSD License, reproduced below.
  *
  * Changes from the reference: typed module instead of globals; no built-in
  * demo templates; input is never mutated; zero-length and zero-size input
  * normalize without dividing by zero; recognition ranks every template
  * instead of returning only the best.
  *
- * Vatavu, R.-D., Anthony, L. and Wobbrock, J.O. (2012). Gestures as point
- * clouds: A $P recognizer for user interface prototypes. Proceedings of the
- * ACM Int'l Conference on Multimodal Interfaces (ICMI '12). Santa Monica,
- * California (October 22-26, 2012). New York: ACM Press, pp. 273-280.
- * https://dl.acm.org/citation.cfm?id=2388732
+ * The reference implementation's header, verbatim:
  *
- * Copyright (C) 2012, Radu-Daniel Vatavu, Lisa Anthony, and
- * Jacob O. Wobbrock. All rights reserved.
+ *    The $P Point-Cloud Recognizer (JavaScript version)
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *    * Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *    * Neither the names of the University Stefan cel Mare of Suceava,
- *      University of Washington, nor UMBC, nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
+ *     Radu-Daniel Vatavu, Ph.D.
+ *     University Stefan cel Mare of Suceava
+ *     Suceava 720229, Romania
+ *     vatavu@eed.usv.ro
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL Radu-Daniel Vatavu OR Lisa Anthony
- * OR Jacob O. Wobbrock BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
- * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ *     Lisa Anthony, Ph.D.
+ *     UMBC
+ *     Information Systems Department
+ *     1000 Hilltop Circle
+ *     Baltimore, MD 21250
+ *     lanthony@umbc.edu
+ *
+ *     Jacob O. Wobbrock, Ph.D.
+ *     The Information School
+ *     University of Washington
+ *     Seattle, WA 98195-2840
+ *     wobbrock@uw.edu
+ *
+ *    The academic publication for the $P recognizer, and what should be
+ *    used to cite it, is:
+ *
+ *        Vatavu, R.-D., Anthony, L. and Wobbrock, J.O. (2012).
+ *        Gestures as point clouds: A $P recognizer for user interface
+ *        prototypes. Proceedings of the ACM Int'l Conference on
+ *        Multimodal Interfaces (ICMI '12). Santa Monica, California
+ *        (October 22-26, 2012). New York: ACM Press, pp. 273-280.
+ *        https://dl.acm.org/citation.cfm?id=2388732
+ *
+ *    This software is distributed under the "New BSD License" agreement:
+ *
+ *    Copyright (C) 2012, Radu-Daniel Vatavu, Lisa Anthony, and
+ *    Jacob O. Wobbrock. All rights reserved. Last updated July 14, 2018.
+ *
+ *    Redistribution and use in source and binary forms, with or without
+ *    modification, are permitted provided that the following conditions are met:
+ *       * Redistributions of source code must retain the above copyright
+ *         notice, this list of conditions and the following disclaimer.
+ *       * Redistributions in binary form must reproduce the above copyright
+ *         notice, this list of conditions and the following disclaimer in the
+ *         documentation and/or other materials provided with the distribution.
+ *       * Neither the names of the University Stefan cel Mare of Suceava,
+ *    	University of Washington, nor UMBC, nor the names of its contributors
+ *    	may be used to endorse or promote products derived from this software
+ *    	without specific prior written permission.
+ *
+ *    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ *    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ *    THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ *    PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL Radu-Daniel Vatavu OR Lisa Anthony
+ *    OR Jacob O. Wobbrock BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ *    EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+ *    OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ *    INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ *    STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ *    OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ *    SUCH DAMAGE.
  */
 
 export interface CloudPoint {

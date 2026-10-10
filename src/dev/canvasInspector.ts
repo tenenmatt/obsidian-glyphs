@@ -124,7 +124,16 @@ function settle(ms: number): Promise<void> {
  */
 export async function probeCanvas(canvas: AnyCanvas, waitMs = 300): Promise<string[]> {
 	const lines: string[] = [];
-	for (const name of ["createTextNode", "importData", "removeNode", "removeEdge", "requestSave", "hitTestNode"]) {
+	for (const name of [
+		"createTextNode",
+		"importData",
+		"removeNode",
+		"removeEdge",
+		"requestSave",
+		"hitTestNode",
+		"getSelectionData",
+		"cloneData",
+	]) {
 		lines.push(`== source: canvas.${name}`, fullSource(canvas[name]));
 	}
 	const nodes: AnyCanvas[] = canvas.nodes instanceof Map ? [...canvas.nodes.values()] : [];
@@ -162,6 +171,29 @@ export async function probeCanvas(canvas: AnyCanvas, waitMs = 300): Promise<stri
 		if (added) canvas.removeEdge(added);
 	} else {
 		lines.push("importData edge experiment skipped: needs two cards");
+	}
+
+	if (nodes.length >= 2 && typeof canvas.getSelectionData === "function" && typeof canvas.cloneData === "function") {
+		const copied = canvas.getSelectionData(new Set([nodes[0], nodes[1]]));
+		lines.push(
+			`getSelectionData(2 cards) -> nodes ${copied.nodes.length}, edges ${copied.edges?.length}, keys ${Object.keys(copied).join(",")}`,
+		);
+		const originalIds = (copied.nodes as { id: string }[]).map((n) => n.id).join(",");
+		const firstX = copied.nodes[0]?.x;
+		const firstY = copied.nodes[0]?.y;
+		const returned = canvas.cloneData(copied, { x: 0, y: 5000 });
+		const cloned = returned ?? copied;
+		lines.push(
+			`cloneData(data, offset 0,5000) -> returns ${returned === undefined ? "undefined (mutates in place)" : returned === copied ? "the same object" : "a new object"}; ` +
+				`ids changed=${(cloned.nodes as { id: string }[]).map((n) => n.id).join(",") !== originalIds}, x ${firstX} -> ${cloned.nodes[0]?.x}, y ${firstY} -> ${cloned.nodes[0]?.y}`,
+		);
+		const before = canvas.nodes.size;
+		canvas.importData(cloned);
+		const pasted = (cloned.nodes as { id: string }[]).map((n) => canvas.nodes.get(n.id)).filter(Boolean);
+		lines.push(`importData(clone) -> nodes ${before} -> ${canvas.nodes.size}, pasted found ${pasted.length}`);
+		for (const node of pasted) canvas.removeNode(node);
+	} else {
+		lines.push("copy/paste experiment skipped: needs two cards, getSelectionData and cloneData");
 	}
 	canvas.requestFrame?.();
 	return lines;

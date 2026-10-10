@@ -129,6 +129,7 @@ Implemented so far (settings tab, `display()`-based; Obsidian 1.13's declarative
 
 - Enable/disable per context (Canvas, Editor).
 - Show unrecognized strokes (flash "?"), default on.
+- Clipboard source (future): the plugin's own clipboard (v1 default: no iPadOS paste prompts) vs the system clipboard, which would interoperate with Canvas's own copy/paste and other apps, and let V paste bare text as a new card.
 - Glyph mode: **always on** vs **toggle** (a command or ribbon button switches glyph mode on/off, so Scribble keeps working when it's off).
 - Recognition threshold.
 - Pen tap on empty canvas: pass through / create text node.

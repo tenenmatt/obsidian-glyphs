@@ -157,13 +157,28 @@ class ProbeCanvas {
 	getData() {
 		return { nodes: [...this.nodes.values()], edges: [...this.edges.values()] };
 	}
-	importData(data: { edges: { id: string }[] }) {
-		if (this.importAddsEdges) for (const e of data.edges) this.edges.set(e.id, e);
+	importData(data: { nodes?: { id: string }[]; edges: { id: string }[] }) {
+		if (this.importAddsEdges) for (const e of data.edges ?? []) this.edges.set(e.id, e);
+		for (const n of data.nodes ?? []) if (!this.nodes.has(n.id)) this.nodes.set(n.id, { ...n });
 	}
 	requestFrame() {
 		this.frames++;
 	}
 	hitTestNode() {}
+	/** How cloneData answers: mutate in place and return nothing, return the input, or return a copy. */
+	cloneMode: "mutate" | "same" | "copy" = "mutate";
+	getSelectionData(items: Set<{ id: string; x?: number; y?: number }>) {
+		return { nodes: [...items].map((n) => ({ id: n.id, x: n.x ?? 0, y: n.y ?? 0 })), edges: [] };
+	}
+	cloneData(data: { nodes: { id: string; x: number; y: number }[] }, offset: { x: number; y: number }) {
+		const target = this.cloneMode === "copy" ? { ...data, nodes: data.nodes.map((n) => ({ ...n })) } : data;
+		for (const n of target.nodes) {
+			n.id = `clone-${n.id}`;
+			n.x += offset.x;
+			n.y += offset.y;
+		}
+		return this.cloneMode === "mutate" ? undefined : target;
+	}
 }
 
 function withCards(canvas: ProbeCanvas, n: number) {
@@ -185,6 +200,42 @@ describe("probeCanvas", () => {
 		expect(canvas.nodes.size).toBe(2);
 		expect(canvas.edges.size).toBe(0);
 		expect(canvas.frames).toBe(1);
+	});
+
+	it("reports what copying and pasting two cards does, then removes the pasted copies", async () => {
+		const canvas = withCards(new ProbeCanvas(), 2);
+		const text = (await probeCanvas(canvas, 0)).join("\n");
+		expect(text).toContain("== source: canvas.cloneData\ncloneData(data, offset)");
+		expect(text).toContain("getSelectionData(2 cards) -> nodes 2, edges 0, keys nodes,edges");
+		expect(text).toContain("cloneData(data, offset 0,5000) -> returns undefined (mutates in place); ids changed=true, x 0 -> 0, y 0 -> 5000");
+		expect(text).toContain("importData(clone) -> nodes 2 -> 4, pasted found 2");
+		expect(canvas.nodes.size).toBe(2);
+	});
+
+	it("tells whether cloneData returns its input or a new object", async () => {
+		for (const [mode, phrase] of [
+			["same", "returns the same object"],
+			["copy", "returns a new object"],
+		] as const) {
+			const canvas = withCards(new ProbeCanvas(), 2);
+			canvas.cloneMode = mode;
+			expect((await probeCanvas(canvas, 0)).join("\n")).toContain(phrase);
+		}
+	});
+
+	it("copes with odd getSelectionData results", async () => {
+		const canvas = withCards(new ProbeCanvas(), 2) as unknown as Record<string, unknown>;
+		canvas.getSelectionData = () => ({ nodes: [], edges: undefined });
+		canvas.cloneData = () => undefined;
+		const text = (await probeCanvas(canvas, 0)).join("\n");
+		expect(text).toContain("getSelectionData(2 cards) -> nodes 0, edges undefined");
+		expect(text).toContain("x undefined -> undefined");
+	});
+
+	it("skips the copy/paste experiment without the methods it needs", async () => {
+		const canvas = withCards(new ProbeCanvas(), 2) as unknown as Record<string, unknown>;
+		canvas.cloneData = undefined;
+		expect((await probeCanvas(canvas, 0)).join("\n")).toContain("copy/paste experiment skipped");
 	});
 
 	it("reports an edge that importData did not add", async () => {

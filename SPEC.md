@@ -145,7 +145,7 @@ A modal opened by a command palette entry ("Pen Glyphs: Show cheatsheet") and op
 1. ✅ **Input spike:** on iPad, log `pointerType` for pen vs finger on a Canvas, and confirm `preventDefault` on pen stops panning while fingers still pan. *This validates the whole approach; stop and reassess if it fails.*
 2. ✅ Stroke overlay rendering, hover dot, fixture recording.
 3. ✅ Recognizer (x, lasso, caret, v, square, line); debug panel showing results.
-4. `CanvasAdapter` and canvas commands: lasso select, X delete (with undo), square new card, line connect, pen tap select. Starts with a dev command that dumps the Canvas internals available in the running Obsidian version.
+4. ✅ `CanvasAdapter` and canvas commands: lasso select, X delete (with undo), square new card, line connect, pen tap select. Starts with a dev command that dumps the Canvas internals available in the running Obsidian version.
 5. Flash notices and cheatsheet.
 6. Copy/paste glyphs, settings, glyph-mode toggle.
 7. v2: editor glyphs, custom templates, finger-as-modifier.

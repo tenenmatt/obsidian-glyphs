@@ -143,7 +143,8 @@ From the first on-device log (2026-10-09, Obsidian 1.14.4, M5 iPad Pro + Pencil 
 - With no blocking, Canvas ignores pen drags (no pan, no card drag). Pen **taps** act through compatibility mouse events (`mousedown mouseup click`, `dblclick`): tap selects a card, double-tap on empty canvas creates one. Canvas does handle `pointerdown` itself on a card's drag handle (`defaultPrevented`).
 - Blocking pen pointer events suppresses `mousedown`/`mouseup` but `click` still arrives.
 - Blocking stylus touch events (`touchType === "stylus"`) suppresses all compatibility mouse events including `click`.
-- Leading candidate: block both (mode `all`). Still to confirm with the full protocol: no pen effect, fingers unaffected, Scribble inside an editing card unaffected.
+- **Chosen: block both (mode `all`).** Confirmed with the full protocol: no pen effect on Canvas (no pan, drag, select, or compatibility mouse events), finger pan/pinch/drag unaffected, Scribble inside an editing card unaffected.
+- Scribble consumes pen strokes natively: while writing in an editing card, no pointer or touch events reach the web view at all (not even hover). The "ignore pen in editing node" check never fired. Pen strokes that start outside the editing card do reach us and are blocked, so with glyphs on, ending an edit needs a finger tap.
 - Pencil hover arrives as pen `pointermove` with `buttons === 0`; position only, angles read as constant (`altitudeAngle` π/2, `azimuthAngle` 0) while hovering.
 - `getCoalescedEvents()` works (~2 samples per event). Pressure and tilt/altitude/azimuth are reported on contact.
 

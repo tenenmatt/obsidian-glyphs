@@ -1,6 +1,6 @@
 # Pen Glyphs: notes for Claude
 
-Apple Pencil glyph commands for Obsidian Canvas on iPad. Read **SPEC.md** first: it holds the design, decisions (with reasons), on-device findings, the recognition pipeline, the confirmed Canvas internals, and milestone status. **README.md** has the status line, dev setup, and per-milestone device test protocols.
+Apple Pencil glyph commands for Obsidian Canvas on iPad. Read **SPEC.md** first: it holds the design, decisions (with reasons), on-device findings, the recognition pipeline, the confirmed Canvas internals, and milestone status. **README.md** has the status line and dev setup; **TESTING.md** has the per-milestone device test protocols.
 
 ## Workflow
 

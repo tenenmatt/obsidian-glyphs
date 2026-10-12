@@ -12,6 +12,13 @@ export interface Clipboard {
 	data: SelectionData | null;
 }
 
+/** What commands need beyond the canvas: the clipboard, and settings. */
+export interface GlyphContext {
+	clipboard: Clipboard;
+	/** A square makes a card the size of the drawing, rather than a standard card. */
+	cardsMatchDrawing: boolean;
+}
+
 /** What a command did: `label` is shown in the flash notice, `detail` only in the debug log. */
 export interface Outcome {
 	label: string;
@@ -22,22 +29,22 @@ export interface Outcome {
  * Run the command for a recognized glyph drawn at `client` points (in client
  * coordinates). Labels use the command names from the cheatsheet.
  */
-export function runCanvasGlyph(canvas: CanvasAdapter, gesture: CanvasGesture, client: Pt[], clipboard: Clipboard): Outcome {
+export function runCanvasGlyph(canvas: CanvasAdapter, gesture: CanvasGesture, client: Pt[], context: GlyphContext): Outcome {
 	const points = client.map((p) => canvas.toCanvas(p));
 	switch (gesture) {
 		case "tap":
 			return tap(canvas, points[0]);
 		case "lasso":
 		case "square":
-			return loop(canvas, gesture, points);
+			return loop(canvas, gesture, points, context.cardsMatchDrawing);
 		case "x":
 			return cross(canvas, points);
 		case "line":
 			return line(canvas, points);
 		case "caret":
-			return copy(canvas, points, clipboard);
+			return copy(canvas, points, context.clipboard);
 		case "v":
-			return paste(canvas, points, clipboard);
+			return paste(canvas, points, context.clipboard);
 	}
 }
 
@@ -72,9 +79,10 @@ function tap(canvas: CanvasAdapter, p: Pt): Outcome {
 /**
  * A closed loop around card centers selects them, whatever its shape, so a
  * squarish lasso never creates a card. Over empty space, a square creates a
- * card and a lasso clears the selection.
+ * card (filling the square if `fillBox`, otherwise a standard card centered on
+ * it) and a lasso clears the selection.
  */
-function loop(canvas: CanvasAdapter, glyph: "lasso" | "square", poly: Pt[]): Outcome {
+function loop(canvas: CanvasAdapter, glyph: "lasso" | "square", poly: Pt[], fillBox: boolean): Outcome {
 	const box = toRect(poly);
 	const enclosed = canvas.cardsOverlapping(box).filter((card) => pointInPolygon(center(card), poly));
 	if (enclosed.length > 0) {
@@ -82,7 +90,7 @@ function loop(canvas: CanvasAdapter, glyph: "lasso" | "square", poly: Pt[]): Out
 		return { label: `select ${plural(enclosed.length, "card")}` };
 	}
 	if (glyph === "square") {
-		canvas.createCard(box);
+		canvas.createCard(box, fillBox);
 		return { label: "new card" };
 	}
 	canvas.clearSelection();

@@ -2,6 +2,13 @@
 
 Per-milestone checks to run on the iPad after a build. Before each one, force-quit Obsidian, reopen it, and confirm the debug panel title shows the expected version. Dev setup is in [README.md](README.md#dev-setup); the design and milestone status are in [SPEC.md](SPEC.md).
 
+## Square card size (0.3.2)
+
+1. With **New cards match the drawing** off (the default), draw a small square and a large one on empty canvas. Each makes a card the same size (as wide as a double-tap card, twice as tall), centered where you drew, open for editing.
+2. Turn the setting on: squares make cards the size of the drawing, as before.
+3. **Undo** removes the new card in both modes.
+4. On the Mac, "Pen Glyphs: Toggle developer tools" is in the command palette, and turning it on reveals the probe and inspect commands.
+
 ## Milestone 6
 
 1. **Caret** on an unselected card: flashes "copy card". **V** somewhere else: a copy appears centered on the V's bottom point, selected; flashes "paste card".

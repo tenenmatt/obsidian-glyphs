@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { Clipboard, nearestSide, runCanvasGlyph, sideCrossed } from "../src/commands/canvasCommands";
+import { Clipboard, GlyphContext, nearestSide, runCanvasGlyph, sideCrossed } from "../src/commands/canvasCommands";
 import { CanvasAdapter, CanvasNode } from "../src/targets/CanvasAdapter";
 import { FakeCanvas } from "./fakeCanvas";
 
 let canvas: FakeCanvas;
 let adapter: CanvasAdapter;
 let clipboard: Clipboard;
+let context: GlyphContext;
 
 beforeEach(() => {
 	clipboard = { data: null };
+	context = { clipboard, cardsMatchDrawing: true };
 	canvas = new FakeCanvas();
 	// Client and canvas coordinates differ, so tests catch a missed conversion.
 	canvas.offset = { x: 1000, y: 1000 };
@@ -17,7 +19,7 @@ beforeEach(() => {
 
 /** The flash label of a command's outcome. */
 const label = (a: CanvasAdapter, g: Parameters<typeof runCanvasGlyph>[1], pts: { x: number; y: number }[]) =>
-	runCanvasGlyph(a, g, pts, clipboard).label;
+	runCanvasGlyph(a, g, pts, context).label;
 /** The sides the first connection is attached to. */
 const sides = () => ({ fromSide: canvas.edges[0].fromSide, toSide: canvas.edges[0].toSide });
 /** Client-coordinate points for canvas-coordinate input. */
@@ -67,6 +69,13 @@ describe("lasso and square", () => {
 		expect(label(adapter, "square", loopAround(100, 100, 400, 300))).toBe("new card");
 		const [card] = canvas.nodes.values();
 		expect(card).toMatchObject({ x: 100, y: 100, width: 300, height: 200, editing: true });
+	});
+
+	it("unless cards match the drawing, a square creates a standard card centered on it", () => {
+		context.cardsMatchDrawing = false;
+		expect(label(adapter, "square", loopAround(100, 100, 400, 300))).toBe("new card");
+		const [card] = canvas.nodes.values();
+		expect(card).toMatchObject({ x: 125, y: 140, width: 250, height: 120, editing: true });
 	});
 
 	it("a lasso around nothing clears the selection", () => {
@@ -122,7 +131,7 @@ describe("line", () => {
 	it("connects the card where it starts to the card where it ends", () => {
 		const a = canvas.addCard(0, 0);
 		const b = canvas.addCard(300, 200);
-		expect(runCanvasGlyph(adapter, "line", client([50, 30], [200, 120], [350, 230]), clipboard)).toEqual({
+		expect(runCanvasGlyph(adapter, "line", client([50, 30], [200, 120], [350, 230]), context)).toEqual({
 			label: "connect",
 			detail: "right → left",
 		});

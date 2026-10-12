@@ -82,6 +82,10 @@ export class FakeCanvas implements CanvasInternals {
 		this.saves++;
 	}
 
+	config?: { defaultTextNodeDimensions?: { width: number; height: number } } = {
+		defaultTextNodeDimensions: { width: 250, height: 60 },
+	};
+
 	createTextNode(o: {
 		pos: Point;
 		size: { width: number; height: number };

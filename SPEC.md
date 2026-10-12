@@ -80,7 +80,7 @@ Misses gray out the ink; hits clear it almost immediately. The debug panel logs 
 | Lasso (closed loop) | any area | Select nodes whose centers are inside the loop; a lasso around nothing clears the selection |
 | Caret ^ | a node or selection | Copy (Allume's model): the card under the caret's center, or the whole selection if that card is selected, with the connections among copied cards. Plugin clipboard. |
 | V | where to paste | Paste (Allume's model), centered on the V's bottom point, with fresh ids; the pasted cards become selected. Can paste repeatedly. |
-| Square (closed, cornered) | empty space | Create a text card filling the square's bounds and open it for editing |
+| Square (closed, cornered) | empty space | Create a text card and open it for editing. By default it's a standard card (as wide as Canvas's double-tap card, twice as tall) centered on the square; with **New cards match the drawing** on, it fills the square's bounds. |
 | Pen tap | a node / empty canvas | Select the node / clear the selection |
 | Line from one card to another | two nodes | Connect them with an edge with an arrow at the card where the stroke ends; any direction, slight curves fine. The edge attaches to the side the stroke last left the first card through and the side it first entered the second card by. |
 
@@ -100,7 +100,7 @@ Confirmed on Obsidian 1.14.4 (desktop) with the "Inspect canvas internals" and "
 - Hit-testing: `hitTestNode(pos)` (topmost card at a point), `getIntersectingNodes({minX, minY, maxX, maxY})`.
 - Selection: `selection` (Set), `selectOnly`, `selectAll(items)`, `deselectAll`.
 - Delete: `removeNode(node)` (also removes its edges), `deleteSelection()`.
-- Create: `createTextNode({pos, size, text, focus, save})`. `pos` is the top-left corner. `focus` (default true) selects the card and calls `startEditing()`.
+- Create: `createTextNode({pos, size, position, text, focus, save})`. `pos` is the top-left corner, or the center with `position: "center"`. Without `size` it uses `config.defaultTextNodeDimensions` (250×60). Double-tapping empty canvas (`onDoubleClick`) calls `createTextNode({pos, position: "center"})`. `focus` (default true) selects the card and calls `startEditing()`.
 - Connect: no create-edge method. `importData({nodes: [], edges: [edge]})` adds an edge; without its second (`clear`) argument it never removes anything. `fromSide`/`toSide` (`top`/`right`/`bottom`/`left`) set where the edge attaches; omitted ones are chosen by Canvas from the cards' relative positions.
 - Copy/paste: `getSelectionData(set)` returns `{nodes, edges, center}` (only edges among the given cards; `center` is the group's bounding-box center). `cloneData(data, offset)` gives cards and edges fresh ids, re-points edges, offsets cards, and mutates and returns its argument, so clone a copy. `importData` then adds the result.
 - Undo: `requestSave()` records a history entry (debounced), so Canvas's own undo/redo reverts glyph commands. `createTextNode` saves unless `save: false`.
@@ -126,7 +126,7 @@ A modal opened by a command palette entry ("Pen Glyphs: Show cheatsheet") and op
 
 ## Settings
 
-Implemented so far (settings tab, `display()`-based; Obsidian 1.13's declarative `getSettingDefinitions()` is the successor to adopt once minAppVersion allows): a cheatsheet button, glyph mode, show unrecognized strokes, developer tools (debug panel plus the dev commands, which are hidden from the command palette when off; default off).
+Implemented so far (settings tab, `display()`-based; Obsidian 1.13's declarative `getSettingDefinitions()` is the successor to adopt once minAppVersion allows): a cheatsheet button, glyph mode, new cards match the drawing (default off: squares make standard-size cards), show unrecognized strokes, developer tools (debug panel plus the dev commands, which are hidden from the command palette when off; default off). Off iPad the plugin stays inactive apart from the canvas dev commands and the "Toggle developer tools" command that reveals them, so the probes can run on desktop.
 
 - Enable/disable per context (Canvas, Editor).
 - Show unrecognized strokes (flash "?"), default on.
@@ -168,6 +168,7 @@ Settled 2026-10-09:
 - **Hover:** target device is an M5 iPad Pro with Apple Pencil Pro. Use hover (e.g. previewing the target) when present; degrade cleanly without it.
 - **Pen tap vs edit:** decide empirically: compare pen double-tap-to-edit against finger-tap-to-edit.
 - **Distribution:** personal use first, community plugin later. Before publishing: settle licensing (incl. vendored $P code) and contact the Allume team.
+- **Square card size** (2026-10-12): drawing the card's exact size took care the author usually didn't want to spend, so by default a square makes a standard card centered where it was drawn; sizing to the drawing is a setting.
 - **Dev loop:** a dedicated test vault synced with Obsidian Sync (plugin + active-plugin-list sync enabled); Safari Web Inspector over USB if Obsidian's web view is inspectable.
 
 ## Spike findings

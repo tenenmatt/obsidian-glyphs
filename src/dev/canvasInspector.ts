@@ -133,6 +133,7 @@ export async function probeCanvas(canvas: AnyCanvas, waitMs = 300): Promise<stri
 		"hitTestNode",
 		"getSelectionData",
 		"cloneData",
+		"onDoubleClick",
 	]) {
 		lines.push(`== source: canvas.${name}`, fullSource(canvas[name]));
 	}
@@ -157,6 +158,15 @@ export async function probeCanvas(canvas: AnyCanvas, waitMs = 300): Promise<stri
 	await settle(waitMs);
 	lines.push(`createTextNode(focus default) -> editing immediately=${editingNow}, after ${waitMs}ms=${focused.isEditing}`);
 	canvas.removeNode(focused);
+
+	lines.push(`config.defaultTextNodeDimensions = ${JSON.stringify(canvas.config?.defaultTextNodeDimensions)}`);
+	for (const position of [undefined, "center"]) {
+		const card = canvas.createTextNode({ pos, position, text: PROBE_TEXT, focus: false, save: false });
+		lines.push(
+			`createTextNode(pos 1000,1000, no size, position ${position}) -> x=${card.x} y=${card.y} w=${card.width} h=${card.height}`,
+		);
+		canvas.removeNode(card);
+	}
 
 	if (nodes.length >= 2) {
 		const id = "pen-glyphs-probe-edge";

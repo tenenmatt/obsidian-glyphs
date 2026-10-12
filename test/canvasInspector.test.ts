@@ -135,13 +135,15 @@ class ProbeCanvas {
 	edges = new Map<string, { id: string }>();
 	frames = 0;
 	importAddsEdges = true;
-	createTextNode(opts: { pos: { x: number; y: number }; size: { width: number; height: number }; focus?: boolean }) {
+	config = { defaultTextNodeDimensions: { width: 250, height: 60 } };
+	createTextNode(opts: { pos: { x: number; y: number }; size?: { width: number; height: number }; position?: string; focus?: boolean }) {
+		opts = { ...opts, size: opts.size ?? this.config.defaultTextNodeDimensions };
 		const node: Record<string, unknown> = {
 			id: `n${this.nodes.size}`,
-			x: opts.pos.x - opts.size.width / 2,
-			y: opts.pos.y - opts.size.height / 2,
-			width: opts.size.width,
-			height: opts.size.height,
+			x: opts.pos.x - (opts.position === "center" ? opts.size!.width / 2 : 0),
+			y: opts.pos.y - (opts.position === "center" ? opts.size!.height / 2 : 0),
+			width: opts.size!.width,
+			height: opts.size!.height,
 			isEditing: false,
 		};
 		if (opts.focus !== false) window.setTimeout(() => (node.isEditing = true), 0);
@@ -194,7 +196,10 @@ describe("probeCanvas", () => {
 		expect(text).toContain("== source: canvas.createTextNode\ncreateTextNode(opts)");
 		expect(text).toContain("== source: canvas.requestSave\n(missing)");
 		expect(text).toContain("== source: node.moveTo\nmoveTo() {}");
-		expect(text).toContain("createTextNode(pos 1000,1000, size 100x60, focus false) -> x=950 y=970 w=100 h=60 editing=false");
+		expect(text).toContain("createTextNode(pos 1000,1000, size 100x60, focus false) -> x=1000 y=1000 w=100 h=60 editing=false");
+		expect(text).toContain("config.defaultTextNodeDimensions = {\"width\":250,\"height\":60}");
+		expect(text).toContain("createTextNode(pos 1000,1000, no size, position undefined) -> x=1000 y=1000 w=250 h=60");
+		expect(text).toContain("createTextNode(pos 1000,1000, no size, position center) -> x=875 y=970 w=250 h=60");
 		expect(text).toContain("createTextNode(focus default) -> editing immediately=false, after 5ms=true");
 		expect(text).toContain("importData(+1 edge) -> edges 0 -> 1, probe edge present=true, nodes still 2");
 		expect(canvas.nodes.size).toBe(2);
@@ -254,7 +259,9 @@ describe("probeCanvas", () => {
 
 	it("treats a canvas without a nodes map as having no cards", async () => {
 		const canvas = { nodes: {}, createTextNode: () => ({}), removeNode: () => {} };
-		expect((await probeCanvas(canvas, 0)).join("\n")).toContain("skipped: needs two cards");
+		const text = (await probeCanvas(canvas, 0)).join("\n");
+		expect(text).toContain("skipped: needs two cards");
+		expect(text).toContain("config.defaultTextNodeDimensions = undefined");
 	});
 });
 

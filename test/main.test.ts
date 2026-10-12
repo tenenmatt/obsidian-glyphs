@@ -76,12 +76,17 @@ describe("activation", () => {
 		const log = vi.spyOn(console, "log").mockImplementation(() => {});
 		const plugin = await load(null, false);
 		expect(log).toHaveBeenCalledWith("[pen-glyphs] not an iPad; staying inactive");
-		expect(plugin.commands.map((c) => c.id)).toEqual(["inspect-canvas-internals", "probe-canvas-behavior"]);
+		expect(plugin.commands.map((c) => c.id)).toEqual(["toggle-debug-panel", "inspect-canvas-internals", "probe-canvas-behavior"]);
 		expect(plugin.isCommandAvailable("inspect-canvas-internals")).toBe(false);
 		expect(document.querySelector(".pen-glyphs-overlay")).toBeNull();
 
-		const dev = await load({ showDebugPanel: true }, false);
-		expect(dev.isCommandAvailable("inspect-canvas-internals")).toBe(true);
+		// Developer tools can be turned on (and off) from the command alone, without a debug panel.
+		await plugin.runCommand("toggle-debug-panel");
+		expect(plugin.settings.showDebugPanel).toBe(true);
+		expect(plugin.isCommandAvailable("inspect-canvas-internals")).toBe(true);
+		await plugin.runCommand("toggle-debug-panel");
+		expect(plugin.settings.showDebugPanel).toBe(false);
+		expect(document.querySelector(".pen-glyphs-debug")).toBeNull();
 	});
 
 	it("needs both the iOS app and a tablet", async () => {
@@ -90,12 +95,12 @@ describe("activation", () => {
 		const plugin = new PenGlyphsPlugin(new App() as never, { id: "pen-glyphs", version: "1" } as never) as TestPlugin;
 		loaded.push(plugin);
 		await plugin.onload();
-		expect(plugin.commands.map((c) => c.id)).toEqual(["inspect-canvas-internals", "probe-canvas-behavior"]);
+		expect(plugin.commands.map((c) => c.id)).toEqual(["toggle-debug-panel", "inspect-canvas-internals", "probe-canvas-behavior"]);
 	});
 
 	it("on iPad with default settings, shows the overlay but not developer tools", async () => {
 		const plugin = await load(null);
-		expect(plugin.settings).toEqual({ glyphMode: true, showMisses: true, showDebugPanel: false });
+		expect(plugin.settings).toEqual({ glyphMode: true, showMisses: true, cardsMatchDrawing: false, showDebugPanel: false });
 		expect(document.querySelector(".pen-glyphs-overlay")).not.toBeNull();
 		expect(document.querySelector(".pen-glyphs-debug")).toBeNull();
 		for (const id of ["inspect-canvas-internals", "probe-canvas-behavior", "save-last-gesture-fixture", "save-debug-log", "copy-debug-log", "clear-debug-log"]) {
@@ -112,8 +117,8 @@ describe("activation", () => {
 	});
 
 	it("restores saved settings", async () => {
-		const plugin = await load({ glyphMode: false, showMisses: false, showDebugPanel: false, blockMode: "all" });
-		expect(plugin.settings).toEqual({ glyphMode: false, showMisses: false, showDebugPanel: false });
+		const plugin = await load({ glyphMode: false, showMisses: false, cardsMatchDrawing: true, showDebugPanel: false, blockMode: "all" });
+		expect(plugin.settings).toEqual({ glyphMode: false, showMisses: false, cardsMatchDrawing: true, showDebugPanel: false });
 		expect(document.querySelector(".pen-glyphs-debug")).toBeNull();
 	});
 
@@ -231,6 +236,15 @@ describe("glyphs on a canvas", () => {
 		drawStroke(view.wrapper, shapes.square());
 		expect(canvas.nodes.size).toBe(1);
 		expect(panelText()).toMatch(/✓ square \(closed, \d corners, fill \d\.\d\d\) → new card/);
+	});
+
+	it("a square's card is standard-size by default, or the drawing's size if the setting says so", async () => {
+		const { plugin, view, canvas } = await canvasPlugin();
+		drawStroke(view.wrapper, shapes.square());
+		expect([...canvas.nodes.values()][0]).toMatchObject({ width: 250, height: 120 });
+		await plugin.updateSetting("cardsMatchDrawing", true);
+		drawStroke(view.wrapper, shapes.square().map((p) => ({ ...p, x: p.x + 300 })));
+		expect([...canvas.nodes.values()][1]).toMatchObject({ width: 120, height: 120 });
 	});
 
 	it("flashes the command's label, but not for taps", async () => {

@@ -25,13 +25,13 @@ describe("PenGlyphsSettingTab", () => {
 	it("shows a toggle per setting with its current value", () => {
 		const { t } = tab();
 		const names = Array.from(t.containerEl.querySelectorAll(".setting-item-name")).map((n) => n.textContent);
-		expect(names).toEqual(["Cheatsheet", "Glyph mode", "Show unrecognized strokes", "Developer tools"]);
-		expect(toggles(t).map((x) => x.checked)).toEqual([true, false, false]);
+		expect(names).toEqual(["Cheatsheet", "Glyph mode", "New cards match the drawing", "Show unrecognized strokes", "Developer tools"]);
+		expect(toggles(t).map((x) => x.checked)).toEqual([true, false, false, false]);
 	});
 
 	it("routes changes through updateSetting", () => {
 		const { t, host } = tab();
-		const showMisses = toggles(t)[1];
+		const showMisses = toggles(t)[2];
 		showMisses.checked = true;
 		showMisses.dispatchEvent(new Event("change"));
 		expect(host.updateSetting).toHaveBeenCalledWith("showMisses", true);
@@ -46,6 +46,6 @@ describe("PenGlyphsSettingTab", () => {
 	it("re-renders cleanly", () => {
 		const { t } = tab();
 		t.display();
-		expect(toggles(t)).toHaveLength(3);
+		expect(toggles(t)).toHaveLength(4);
 	});
 });

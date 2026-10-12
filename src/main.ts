@@ -27,6 +27,11 @@ export default class PenGlyphsPlugin extends Plugin {
 		this.settings = loadSettings(await this.loadData());
 
 		// Available on desktop too, since desktop Canvas has the same internals.
+		this.addCommand({
+			id: "toggle-debug-panel",
+			name: "Toggle developer tools",
+			callback: () => this.updateSetting("showDebugPanel", !this.settings.showDebugPanel),
+		});
 		this.devCommand("inspect-canvas-internals", "Inspect canvas internals (dev)", () => this.inspectCanvas());
 		this.devCommand("probe-canvas-behavior", "Probe canvas behavior (dev)", () => this.probeCanvas());
 
@@ -73,11 +78,6 @@ export default class PenGlyphsPlugin extends Plugin {
 			name: "Toggle glyph mode",
 			callback: () => this.toggleGlyphMode(),
 		});
-		this.addCommand({
-			id: "toggle-debug-panel",
-			name: "Toggle developer tools",
-			callback: () => this.updateSetting("showDebugPanel", !this.settings.showDebugPanel),
-		});
 		this.devCommand("save-last-gesture-fixture", "Save last gesture as fixture (dev)", () => this.openSaveFixture());
 		this.devCommand("save-debug-log", "Save debug log to vault (dev)", () => this.saveLog());
 		this.devCommand("copy-debug-log", "Copy debug log to clipboard (dev)", () => this.panel.copy());
@@ -109,8 +109,9 @@ export default class PenGlyphsPlugin extends Plugin {
 			this.panel.log(`---- glyph mode ${value ? "on" : "off"} ----`);
 			this.panel.refreshActions();
 		} else if (key === "showDebugPanel") {
-			if (value) this.panel.show();
-			else this.panel.hide();
+			// No panel off iPad, where only the dev commands exist.
+			if (value) this.panel?.show();
+			else this.panel?.hide();
 		}
 	}
 
@@ -150,7 +151,10 @@ export default class PenGlyphsPlugin extends Plugin {
 			return { label: "canvas unavailable", detail };
 		}
 		try {
-			return runCanvasGlyph(canvas, gesture, stroke.points, this.clipboard);
+			return runCanvasGlyph(canvas, gesture, stroke.points, {
+				clipboard: this.clipboard,
+				cardsMatchDrawing: this.settings.cardsMatchDrawing,
+			});
 		} catch (err) {
 			new Notice(`Pen Glyphs: ${gesture} failed: ${String(err)}`);
 			return { label: `${gesture} failed`, detail: String(err) };

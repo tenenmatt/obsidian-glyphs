@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CanvasAdapter, MIN_CARD, canvasViewFor, newId } from "../src/targets/CanvasAdapter";
+import { CanvasAdapter, DEFAULT_TEXT_CARD, MIN_CARD, canvasViewFor, newId } from "../src/targets/CanvasAdapter";
 import { FakeCanvas } from "./fakeCanvas";
 import { App, FakeWorkspace } from "./obsidian";
 
@@ -85,11 +85,28 @@ describe("CanvasAdapter", () => {
 
 	it("creates a card filling a box, opened for editing, never smaller than the minimum", () => {
 		const { canvas, adapter } = adapt();
-		const big = adapter.createCard({ minX: 10, minY: 20, maxX: 310, maxY: 220 });
+		const big = adapter.createCard({ minX: 10, minY: 20, maxX: 310, maxY: 220 }, true);
 		expect(big).toMatchObject({ x: 10, y: 20, width: 300, height: 200, text: "", editing: true });
-		const small = adapter.createCard({ minX: 0, minY: 0, maxX: 5, maxY: 5 });
+		const small = adapter.createCard({ minX: 0, minY: 0, maxX: 5, maxY: 5 }, true);
 		expect(small).toMatchObject({ width: MIN_CARD.width, height: MIN_CARD.height });
 		expect(canvas.saves).toBe(2);
+	});
+
+	it("otherwise creates a standard card centered on the box: double-tap width, twice the height", () => {
+		const { canvas, adapter } = adapt();
+		canvas.config = { defaultTextNodeDimensions: { width: 300, height: 50 } };
+		const card = adapter.createCard({ minX: 0, minY: 0, maxX: 40, maxY: 20 }, false);
+		expect(card).toMatchObject({ x: -130, y: -40, width: 300, height: 100, text: "", editing: true });
+		expect(canvas.saves).toBe(1);
+	});
+
+	it("falls back to Canvas's usual double-tap size when its config doesn't say", () => {
+		const { canvas, adapter } = adapt();
+		const size = { width: DEFAULT_TEXT_CARD.width, height: DEFAULT_TEXT_CARD.height * 2 };
+		canvas.config = {};
+		expect(adapter.createCard({ minX: 0, minY: 0, maxX: 0, maxY: 0 }, false)).toMatchObject(size);
+		canvas.config = undefined;
+		expect(adapter.createCard({ minX: 0, minY: 0, maxX: 0, maxY: 0 }, false)).toMatchObject(size);
 	});
 
 	it("connects two cards with an arrow, adding without clearing, and saves", () => {

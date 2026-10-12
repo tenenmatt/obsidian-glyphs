@@ -5,6 +5,8 @@ export interface PenGlyphsSettings {
 	glyphMode: boolean;
 	/** Flash "?" when a stroke isn't recognized as any glyph. */
 	showMisses: boolean;
+	/** A square makes a card the size of the drawing; off, a standard-size card centered on it. */
+	cardsMatchDrawing: boolean;
 	/** Developer tools: the on-screen debug panel and the dev commands. */
 	showDebugPanel: boolean;
 }
@@ -12,6 +14,7 @@ export interface PenGlyphsSettings {
 export const DEFAULT_SETTINGS: PenGlyphsSettings = {
 	glyphMode: true,
 	showMisses: true,
+	cardsMatchDrawing: false,
 	showDebugPanel: false,
 };
 
@@ -21,6 +24,7 @@ export function loadSettings(data: unknown): PenGlyphsSettings {
 	return {
 		glyphMode: saved.glyphMode ?? DEFAULT_SETTINGS.glyphMode,
 		showMisses: saved.showMisses ?? DEFAULT_SETTINGS.showMisses,
+		cardsMatchDrawing: saved.cardsMatchDrawing ?? DEFAULT_SETTINGS.cardsMatchDrawing,
 		showDebugPanel: saved.showDebugPanel ?? DEFAULT_SETTINGS.showDebugPanel,
 	};
 }
@@ -48,6 +52,11 @@ export class PenGlyphsSettingTab extends PluginSettingTab {
 			.setDesc("Every glyph, what to draw it over, and what it does.")
 			.addButton((b) => b.setButtonText("Show cheatsheet").onClick(() => this.host.openCheatsheet()));
 		this.toggle("Glyph mode", "The pen draws glyph commands on canvases. Off: the pen behaves as usual.", "glyphMode");
+		this.toggle(
+			"New cards match the drawing",
+			"A square makes a card the size of the square. Off: a standard-size card, centered where you drew.",
+			"cardsMatchDrawing",
+		);
 		this.toggle(
 			"Show unrecognized strokes",
 			`Flash a "?" when a stroke isn't any glyph. Unrecognized ink still turns gray either way.`,

@@ -39,6 +39,8 @@ export interface SelectionData {
 
 export interface CanvasInternals {
 	nodes: Map<string, CanvasNode>;
+	/** `defaultTextNodeDimensions` is the size of a card made by double-tapping. */
+	config?: { defaultTextNodeDimensions?: { width: number; height: number } };
 	selection: Set<unknown>;
 	posFromClient(p: Point): Point;
 	hitTestNode(p: Point, padding?: number): CanvasNode | null;
@@ -79,6 +81,9 @@ const REQUIRED_METHODS = [
 
 // Smallest card a square creates, in canvas units.
 export const MIN_CARD = { width: 120, height: 60 };
+
+// Canvas's double-tap card size, used if its config doesn't give one.
+export const DEFAULT_TEXT_CARD = { width: 250, height: 60 };
 
 export class CanvasAdapter {
 	private constructor(private canvas: CanvasInternals) {}
@@ -137,17 +142,26 @@ export class CanvasAdapter {
 		return cards;
 	}
 
-	/** Create an empty text card filling `box` and open it for editing. Undoable. */
-	createCard(box: Rect): CanvasNode {
-		return this.canvas.createTextNode({
-			pos: { x: box.minX, y: box.minY },
-			size: {
+	/**
+	 * Create an empty text card and open it for editing. Undoable. With
+	 * `fillBox` the card fills `box`; otherwise it's a standard card (as wide as
+	 * a double-tapped card, twice as tall) centered on the box.
+	 */
+	createCard(box: Rect, fillBox: boolean): CanvasNode {
+		let pos: Point;
+		let size: { width: number; height: number };
+		if (fillBox) {
+			pos = { x: box.minX, y: box.minY };
+			size = {
 				width: Math.max(MIN_CARD.width, box.maxX - box.minX),
 				height: Math.max(MIN_CARD.height, box.maxY - box.minY),
-			},
-			text: "",
-			focus: true,
-		});
+			};
+		} else {
+			const base = this.canvas.config?.defaultTextNodeDimensions ?? DEFAULT_TEXT_CARD;
+			size = { width: base.width, height: base.height * 2 };
+			pos = { x: (box.minX + box.maxX - size.width) / 2, y: (box.minY + box.maxY - size.height) / 2 };
+		}
+		return this.canvas.createTextNode({ pos, size, text: "", focus: true });
 	}
 
 	/**
